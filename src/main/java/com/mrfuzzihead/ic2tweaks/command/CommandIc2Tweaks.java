@@ -68,7 +68,9 @@ public class CommandIc2Tweaks extends CommandBase {
                 + " cableMeltdown="
                 + EnetOverloadConfig.cableMeltdown
                 + " shocks="
-                + EnetOverloadConfig.shocks);
+                + EnetOverloadConfig.shocks
+                + " demandCapped="
+                + EnetOverloadConfig.demandCapped);
         send(sender, "conductors registered in this world: " + conductorCount(sender));
     }
 

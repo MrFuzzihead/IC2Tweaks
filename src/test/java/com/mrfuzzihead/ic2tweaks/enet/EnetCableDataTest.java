@@ -36,4 +36,29 @@ class EnetCableDataTest {
         assertEquals(0D, EnetCableData.conductionLoss(15));
         assertEquals(0D, EnetCableData.conductionLoss(Integer.MAX_VALUE));
     }
+
+    @Test
+    void insulationEnergyAbsorptionMatches1122Formula() {
+        // tin is special-cased in 1.12.2: getPowerFromTier(insulation)
+        assertEquals(8D, EnetCableData.insulationEnergyAbsorption(10));
+        assertEquals(32D, EnetCableData.insulationEnergyAbsorption(13));
+        assertEquals(32D, EnetCableData.insulationEnergyAbsorption(14));
+
+        // every other insulatable cable: getPowerFromTier(insulation + 1)
+        assertEquals(32D, EnetCableData.insulationEnergyAbsorption(1)); // bare copper
+        assertEquals(128D, EnetCableData.insulationEnergyAbsorption(0)); // insulated copper
+        assertEquals(32D, EnetCableData.insulationEnergyAbsorption(2)); // bare gold
+        assertEquals(128D, EnetCableData.insulationEnergyAbsorption(3)); // insulated gold
+        assertEquals(512D, EnetCableData.insulationEnergyAbsorption(4)); // 2x insulated gold
+        assertEquals(32D, EnetCableData.insulationEnergyAbsorption(5)); // bare HV
+        assertEquals(128D, EnetCableData.insulationEnergyAbsorption(6)); // insulated HV
+        assertEquals(512D, EnetCableData.insulationEnergyAbsorption(7)); // 2x insulated HV
+        assertEquals(2048D, EnetCableData.insulationEnergyAbsorption(8)); // 3x insulated HV
+
+        // cables that cannot be insulated never shock
+        assertEquals(EnetCableData.NO_SHOCK, EnetCableData.insulationEnergyAbsorption(9));
+        assertEquals(EnetCableData.NO_SHOCK, EnetCableData.insulationEnergyAbsorption(11));
+        assertEquals(EnetCableData.NO_SHOCK, EnetCableData.insulationEnergyAbsorption(12));
+        assertEquals(EnetCableData.NO_SHOCK, EnetCableData.insulationEnergyAbsorption(99));
+    }
 }

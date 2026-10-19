@@ -334,11 +334,13 @@ In-game (dev client + dedicated server):
 | Piece | Where | Notes |
 |---|---|---|
 | GTNH late-mixin infrastructure | `com.mrfuzzihead.ic2tweaks.mixins` (`Mixins`, `TargetMods`, `LateMixinsLoader`), `mixins.ic2tweaks.json`, `mixins.ic2tweaks.late.json` | late-only (IC2 is a mod); `usesMixins = true`, `mixinsPackage = mixins` |
-| Master toggle + sub-toggles | `EnetOverloadConfig` (`energynet` category in `ic2tweaks.cfg`) | `enableEnetOverload` defaults to `true`; read before Forge preInit so `setApplyIf` sees the real file |
+| Master toggle + sub-toggles | `EnetOverloadConfig` (`energynet` category in `ic2tweaks.cfg`) | `enableEnetOverload` defaults to `true`; also `enableDemandCappedPackets` (opt-in, default `false`, gap 5); read before Forge preInit so `setApplyIf` sees the real file |
 | Linear-model override | `MixinEnergyNetLocalLinearModel` | `<clinit>` `@Inject` + `@Mutable @Shadow @Final useLinearTransferModel`, hard-sets `true` and ignores `IC2.ini`; only applied when the master toggle is on |
 | Machine explosions | `MixinEnergyNetLocalOverload` + `EnetOverload` | `@Redirect` on `IEnergySink.injectEnergy` inside `processChanges`, applied at `RETURN` (`locked == false`); uses `amount - returned` so a full machine that rejects the packet does not explode |
-| Cable meltdown + shocks | `EnetConductorRegistry` + `EnetCableEffects` | public-API per-world tick pass over registered `IEnergyConductor`s; `NodeStats` throughput vs `getConductorBreakdownEnergy()`; meltdown and shock are computed in the same pass, so a melting cable still shocks; shock energy is accumulated per entity and applied once per tick (gap 6 closed) |
+| Cable meltdown + shocks | `EnetConductorRegistry` + `EnetCableEffects` | public-API per-world tick pass over registered `IEnergyConductor`s; `NodeStats` throughput vs `getConductorBreakdownEnergy()`; meltdown and shock are computed in the same pass, so a melting cable still shocks; shock energy is accumulated per entity and applied once per tick (gap 6 closed); runs at `EventPriority.LOW` so it reads the same tick's stats as IC2's own handler |
+| Cable absorption parity | `MixinTileEntityCable` + `EnetCableData` | overrides `getInsulationEnergyAbsorption()` with IC2 1.12.2's insulation-level formula (tin special-cased, non-insulatable cables immune) |
 | Cable loss tooltip | `MixinItemCable` + `EnetCableData` | appends `Loss: N EU/block` to `ItemCable`'s tooltip next to IC2's packet-size line; gated by the master toggle |
+| Graceful overload hooks | `api/IOverloadHandler`, `api/IExplosionPowerOverride` + `EnetOverload` | mod-local equivalents of the 1.12.2 interfaces, checked in 1.12.2 order; `EnetOverload` builds the `ExplosionIC2` itself so `getExplosionPower` can resize the blast |
 | Pure decisions + tests | `EnetOverloadMath`, `EnetCableData`, `EnetOverloadMathTest`, `EnetCableDataTest` | strict `>`, NaN/infinite/non-positive safe; cable loss table pinned to the IC2 build |
 | Runtime smoke test | `./gradlew runServer` with the master toggle on | mixins load (`Loading [mixins.ic2tweaks.late.json] ...`), the override log fires, server reaches `Done`, no mixin/injection errors |
 
@@ -488,9 +490,9 @@ category of `config/ic2tweaks.cfg`.
 - [ ] Default install (`enableEnetOverload=true`): the log contains
       `[IC2Tweaks] Energy-net overload enabled: forced IC2 useLinearTransferModel=true (IC2.ini ignored)`.
 - [ ] With `enableEnetOverload=false`, the log says `Not loading the following LATE mixins:
-      [ic2.MixinEnergyNetLocalLinearModel, ic2.MixinEnergyNetLocalOverload, ic2.MixinItemCable]` and IC2
-      behaves exactly as before (IC2.ini's `misc/useLinearTransferModel` is honoured, and cable tooltips
-      have no loss line).
+      [ic2.MixinEnergyNetLocalLinearModel, ic2.MixinEnergyNetLocalOverload, ic2.MixinItemCable,
+      ic2.MixinTileEntityCable]` and IC2 behaves exactly as before (IC2.ini's `misc/useLinearTransferModel`
+      is honoured, cable tooltips have no loss line, and cable absorption is the stock 1.7.10 table).
 - [ ] With the master switch on, set `IC2.ini` `misc/useLinearTransferModel=false` and confirm the game
       still uses the linear model (see 10.2).
 - [ ] The config file keeps the `energynet` category and the chosen values across restarts (no reset, no
@@ -535,13 +537,15 @@ category of `config/ic2tweaks.cfg`.
 - [ ] Standing next to an overloaded copper cable (MFSU → copper → LV) deals electric damage on the
       tick it melts as well as on the preceding ticks (meltdown and shock are computed in the same
       pass); the death message is IC2's electric source.
-- [ ] With IC2 1.7.10's absorption values, only *uninsulated* cables shock (bare copper 5, bare gold 6,
-      bare tin 8, bare HV 3; every insulated cable is 9001). A bare copper cable carrying more than
-      5 EU/t deals 1 damage per tick window.
+- [ ] Absorption follows IC2 1.12.2's insulation formula: bare tin shocks above 8 EU/t, bare
+      copper/gold/HV above 32 EU/t; insulated copper/gold/HV above 128 EU/t, 2x insulated above 512,
+      3x insulated HV above 2048; glass fibre, detector and splitter never shock. (A BatBox circuit at
+      ~20 EU/t therefore shocks on bare tin and bare copper alike.)
 - [ ] Shock damage is applied once per tick per entity, not once per cable tile: a long run must not
       out-damage a single tile at the same throughput (max-per-entity accumulation, gap 6 closed).
 - [ ] `enableEnetShocks=false`: no damage.
-- [ ] BatBox → insulated copper → LV: no damage (absorption 9001).
+- [ ] `enableDemandCappedPackets=true`: a sink with a small remaining demand receives only that amount
+      and the excess is returned to the source (compare machine charge speed with the option off).
 
 ### 10.6 Robustness / regression
 
@@ -597,8 +601,10 @@ in 1.12.2.
 **Verdict / decision.** The observation matches 1.12.2's design rather than the port's current table
 (our copper is more sensitive than our tin). If the in-game comparison really was bare tin vs bare
 copper in the same circuit it needs a repro; the likely explanations are bare tin vs *insulated* copper,
-or different circuit throughputs. Absorption parity is **deferred** — the 1.7.10 values stay for now and
-are documented here and in the README.
+or different circuit throughputs. Absorption parity is **implemented** (round 2, §13):
+`MixinTileEntityCable` now overrides `getInsulationEnergyAbsorption()` with the 1.12.2 formula, so bare
+tin (8) is the most sensitive common cable, bare copper/gold/HV sit at 32, and insulated cables scale
+by layer.
 
 ### 11.2 Missing ~495 EU on a direct BatBox → BatBox connection
 
@@ -651,33 +657,36 @@ moved into the same pass. Two earlier assessments are corrected here:
 
 | Dimension | Parity | Notes |
 |---|---|---|
-| Effect rules (what melts / explodes / shocks) | ~90% | The remaining rule gap is the absorption table (gap 14). |
+| Effect rules (what melts / explodes / shocks) | ~98% | Absorption parity and the graceful hooks landed in round 2 (§13); only suppression (gap 4) is missing. |
 | Effect math (thresholds, damage, blast) | ~95% | `ceil(energy / 64)`, `capacity + 1` breakdown, tier power, 2.5 / 0.75 blast all match. |
-| Tick coherence | ~85% | Both effects fire in the same pass now; the cable pass is still a separate world-tick pass from the machine pass. |
+| Tick coherence | ~90% | The cable pass runs at `EventPriority.LOW`, so it reads the same tick's stats as IC2's handler; it is still a separate pass from machine explosions. |
 | Per-packet fidelity (junctions, multi-source, multi-packet) | ~50% | Gap 1 knocks on to melt/shock/explosion values and false positives. |
-| Interop / config surface | ~70% | No graceful hooks; config lives in `ic2tweaks.cfg`; otherwise clean. |
+| Interop / config surface | ~90% | `IOverloadHandler` / `IExplosionPowerOverride` added; config still lives in `ic2tweaks.cfg`. |
 
 ### 12.2 Revised gap matrix
 
 | # | 1.12.2 behaviour | Ours | Status | Effort |
 |---|------------------|------|--------|--------|
 | 1 | Per-source `EnergyPath`, `maxPacketConducted` per packet | per-node `max(currentIn, currentOut) · V` | Missing (structural) | Very high |
-| 3 | `IOverloadHandler.onOverload(tier)`, `IExplosionPowerOverride` | absent | Missing | Easy |
+| 3 | `IOverloadHandler.onOverload(tier)`, `IExplosionPowerOverride` | mod-local interfaces, checked in 1.12.2 order | **Closed** | — |
 | 4 | suppress sink explosion when a cable on the path overloaded | both effects fire | Missing | Hard, low value |
-| 5 | `amount = min(offer − loss, sinkDemand)` | all-or-nothing `injectEnergy`, no cap | Missing | Easy code / high balance risk |
+| 5 | `amount = min(offer − loss, sinkDemand)` | opt-in `enableDemandCappedPackets` clamps to demand (default off) | Partial (opt-in) | Low |
 | 6 | max per conductor per path, sum across paths, one `ceil(/64)` | max across conductors, one `ceil(/64)` | Approximated (closed) | Medium for exact path sums |
-| 7 | `ExplosionIC2.Type.Electrical` | `IC2.explodeMachineAt`, no type | Partial | Easy-medium |
+| 7 | `ExplosionIC2.Type.Electrical` | direct `ExplosionIC2` construction; 1.7.10 has no `Electrical` type | Partial (type unavailable) | — |
 | 9 | keys in `IC2.ini`; `enetCableMeltdown=false` also disables explosions/shocks | `ic2tweaks.cfg`; separate toggles (superset) | Cosmetic | Easy |
 | 11 | `NodeStats` from path data, same tick | `lastNodeStats` = `current · V`, one-tick stale | Missing | Medium |
-| 12 | effects run inside the calculator, one pass per grid tick | machines in `processChanges`, cables at `WorldTickEvent.END` | Partial | Medium |
+| 12 | effects run inside the calculator, one pass per grid tick | cables run at `EventPriority.LOW` (same-tick stats) but are still a separate pass | Partial | Low |
 | 13 | no tier-resistance starvation | high-tier machines starve | Inherent IC2 quirk | Medium (mitigation) |
-| 14 | absorption = `tierPower(insulation + (tin ? 0 : 1))`; non-insulatable types immune | 1.7.10 legacy table (Cu 5, Au 6, HV 3, Sn 8; insulated 9001) | Missing (deferred) | Easy |
+| 14 | absorption = `tierPower(insulation + (tin ? 0 : 1))`; non-insulatable types immune | `MixinTileEntityCable` overrides absorption with the 1.12.2 formula | **Closed** | — |
 | 15 | sink explosion on `amount` (post demand cap) | on `accepted` (`amount − returned`) | Equivalent for all-or-nothing sinks | Low |
 | 16 | multi-packet sources (`IMultiEnergySource`) | 1.7.10 has no such API | Missing (part of 1) | Structural |
 
 Gaps 2, 8 and 10 are closed or inherent as noted above.
 
-### 12.3 If we want full effect parity
+### 12.3 Effect parity (round-2 status)
+
+Items 1–2 are implemented and item 3 is partially addressed (see §13); items 4–5 remain. The original
+plan is kept below for reference.
 
 1. **Absorption table (gap 14)** — the one remaining visible rule gap. Map the 1.7.10 metas to insulation
    levels and use `getPowerFromTier(insulation + (tin ? 0 : 1))`, with glass/detector/splitter immune.
@@ -713,3 +722,27 @@ keeping 1.7.10 delivery but running one solve per source (others zeroed) to attr
 sources and synthesise path data *for effects only* — makes effects per-source accurate without touching
 delivery, but costs O(sources) extra solves per grid per tick and still cannot model true packet caps.
 It is clever but probably not worth it vs. the effect-parity work in §12.3.
+
+---
+
+## 13. Round-2 parity work (current linear-model system)
+
+Everything below is implemented on the existing per-node model. The per-packet calculator (gap 1) is
+still deferred to a separate branch.
+
+| Item | What changed | Files |
+|---|---|---|
+| Absorption parity (gap 14, finding 1) | `getInsulationEnergyAbsorption()` is overridden with IC2 1.12.2's `getPowerFromTier(insulation + (tin ? 0 : 1))` rule, non-insulatable cables immune. Bare tin (8) is now the most sensitive common cable; bare copper/gold/HV are 32; insulated cables scale 128/512/2048. | `MixinTileEntityCable`, `EnetCableData`, `EnetCableDataTest` |
+| Graceful hooks (gap 3) | Added `IOverloadHandler` and `IExplosionPowerOverride`; `EnetOverload` checks them in 1.12.2 order (config → `onOverload` → `shouldExplode`/`getExplosionPower`) and builds the `ExplosionIC2` itself so the blast can be resized. Per-tile dedupe with the max offending packet mirrors 1.12.2's `sinksToExplode`. | `api/IOverloadHandler`, `api/IExplosionPowerOverride`, `EnetOverload` |
+| Demand cap (gap 5) | Opt-in `enableDemandCappedPackets` (default `false`) clamps each injection at `getDemandedEnergy()`, mirroring 1.12.2's packet sizing. Off by default because it changes delivery for every machine. | `EnetOverloadConfig`, `MixinEnergyNetLocalOverload`, `EnetOverloadMath`, `EnetOverloadMathTest` |
+| Same-tick cable stats (gap 12, partial) | The cable pass is registered at `EventPriority.LOW`, guaranteeing it is dispatched after IC2's `NORMAL` enet tick and reads the current tick's `NodeStats`. It is still a separate pass from machine explosions. | `EnetCableEffects` |
+| Explosion type (gap 7) | `ExplosionIC2` is constructed directly with a configurable power. 1.7.10's `ExplosionIC2.Type` only has `Normal`/`Heat`/`Nuclear`, so 1.12.2's `Electrical` cannot be reproduced. | `EnetOverload` |
+
+Still open on the current system:
+
+- gap 1 / 16 — per-packet paths and multi-packet sources (structural; separate branch);
+- gap 4 — `conductorOverload` suppression (hard, and dropped by later upstream IC2);
+- gap 9 — config key location (cosmetic);
+- gap 11 — `NodeStats` one-tick staleness (low value);
+- gap 13 — IC2 linear-model tier starvation (inherent to forcing the model);
+- gap 15 — `accepted` vs `amount` for the explosion test (equivalent for all-or-nothing 1.7.10 sinks).

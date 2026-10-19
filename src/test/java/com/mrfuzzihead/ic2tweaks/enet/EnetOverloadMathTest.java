@@ -78,4 +78,17 @@ class EnetOverloadMathTest {
         assertEquals(0, EnetOverloadMath.shockDamageFromEnergy(-1.0D));
         assertEquals(0, EnetOverloadMath.shockDamageFromEnergy(Double.NaN));
     }
+
+    @Test
+    void demandClampMirrors1122PacketSizing() {
+        assertEquals(5.0D, EnetOverloadMath.clampToDemand(20, 5));
+        assertEquals(20.0D, EnetOverloadMath.clampToDemand(20, 100));
+        assertEquals(0.0D, EnetOverloadMath.clampToDemand(20, 0));
+        assertEquals(0.0D, EnetOverloadMath.clampToDemand(20, -1));
+        // a broken demand must never silently suppress delivery
+        assertEquals(20.0D, EnetOverloadMath.clampToDemand(20, Double.NaN));
+        assertEquals(20.0D, EnetOverloadMath.clampToDemand(20, Double.POSITIVE_INFINITY));
+        assertEquals(0.0D, EnetOverloadMath.clampToDemand(-1, 5));
+        assertEquals(0.0D, EnetOverloadMath.clampToDemand(Double.NaN, 5));
+    }
 }

@@ -17,6 +17,10 @@ that changes to IC2 itself can be shipped and versioned independently.
   While enabled it forces IC2's linear transfer model (ignoring `IC2.ini`), which is the model that
   carries physical voltage/current data. Cable items also gain an energy-loss tooltip line.
   See [Configuration](#configuration).
+- **1.12.2-parity cable rules**: shock thresholds use IC2 1.12.2's insulation formula (bare tin is the
+  most sensitive cable at 8 EU/t; insulated cables scale by layer), and TEs can opt out of or resize an
+  over-voltage blast via `com.mrfuzzihead.ic2tweaks.api.IOverloadHandler` /
+  `IExplosionPowerOverride`.
 
 ## Requirements
 
@@ -37,14 +41,15 @@ that changes to IC2 itself can be shipped and versioned independently.
 | `enableEnetExplosions` | `true` | Machines explode when they accept a packet above their tier's voltage |
 | `enableEnetCableMeltdown` | `true` | Cables melt when their carried energy exceeds the conductor breakdown energy |
 | `enableEnetShocks` | `true` | Living entities near an overloaded cable take electric shock damage |
+| `enableDemandCappedPackets` | `false` | Cap each injection at the sink's remaining demand (IC2 1.12.2 packet sizing). Off because it changes how much energy every machine receives |
 
 Because the overload system changes global IC2 behaviour (and enables IC2's experimental lossy energy
 model), it is **on by default**; set `enableEnetOverload=false` to disable it and restore stock IC2
 behaviour. Cable meltdown and shocks only work while the linear transfer model is active, which the
 master switch forces.
 
-Known limitations (pre-existing IC2 linear-model behaviour unless noted; see
-`ENET_OVERLOAD_ANALYSIS.md` gaps 10 and 13):
+Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
+`ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 
 - IC2's linear model loses energy on every link, including a direct machine-to-machine connection. A
   BatBox feeding another BatBox loses about 1.2% of the transferred energy (the link's 0.4 Ω inner
@@ -52,9 +57,26 @@ Known limitations (pre-existing IC2 linear-model behaviour unless noted; see
   stranding the remainder.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
   upgrades (roughly 6+ on an MFSU) draw almost no power.
-- Cable shock sensitivity still uses IC2 1.7.10's hard-coded absorption values (bare copper 5, gold 6,
-  HV 3, tin 8; insulated cables never shock), not IC2 1.12.2's insulation-based formula. This is
-  documented for now and will be revisited.
+- Cable shock sensitivity follows IC2 1.12.2's insulation-based formula (bare tin 8, bare copper/gold/HV
+  32, insulated layers 128/512/2048; glass/detector/splitter never shock).
+- Overload checks use 1.7.10's **per-node aggregate** values, not 1.12.2's per-source packet sizes. At a
+  junction or with several sources feeding one cable, the cable can trip earlier than it would in 1.12.2,
+  and two same-tier sources can trip the machine-explosion check. This is the remaining structural
+  divergence; a packet-based calculator is planned separately.
+- Insulated tin reports a conduction loss of 0.025 EU/block in IC2 1.7.10 (the same as glass fibre and
+  lower than bare tin); the tooltip shows that value verbatim so it matches the simulation.
+
+## API
+
+Mods whose machines should survive (or shrink) an over-voltage packet can implement either interface on
+their tile entity:
+
+- `com.mrfuzzihead.ic2tweaks.api.IOverloadHandler` — `boolean onOverload(int tier)`; return `true` to
+  cancel the default explosion.
+- `com.mrfuzzihead.ic2tweaks.api.IExplosionPowerOverride` — `boolean shouldExplode()` and
+  `float getExplosionPower(int tier, float defaultPower)`.
+
+Both mirror IC2 Experimental 1.12.2's interfaces of the same name.
 
 ## Diagnostics
 

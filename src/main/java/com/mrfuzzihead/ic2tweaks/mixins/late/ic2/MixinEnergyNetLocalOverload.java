@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverload;
+import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
+import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadMath;
 
 import ic2.api.energy.tile.IEnergySink;
 import ic2.core.energy.EnergyNetLocal;
@@ -40,12 +42,17 @@ public abstract class MixinEnergyNetLocalOverload {
         require = 1,
         remap = false)
     private double ic2tweaks$captureInjection(IEnergySink sink, ForgeDirection dir, double amount, double voltage) {
-        double returned = sink.injectEnergy(dir, amount, voltage);
+        double injectAmount = amount;
+        if (EnetOverloadConfig.demandCapped) {
+            injectAmount = EnetOverloadMath.clampToDemand(amount, sink.getDemandedEnergy());
+        }
+        double returned = sink.injectEnergy(dir, injectAmount, voltage);
         if (ic2tweaks$injections == null) {
             ic2tweaks$injections = new ArrayList<>();
         }
-        ic2tweaks$injections.add(new EnetOverload.Injection(sink, amount - returned));
-        return returned;
+        ic2tweaks$injections.add(new EnetOverload.Injection(sink, injectAmount - returned));
+        // Hand any amount we withheld (demand cap) plus the sink's own rejection back to IC2.
+        return amount - injectAmount + returned;
     }
 
     @Inject(method = "processChanges", at = @At("RETURN"), remap = false)

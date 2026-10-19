@@ -31,6 +31,12 @@ public enum Mixins implements IMixins {
     ITEM_CABLE_TOOLTIP(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinItemCable")
         .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> EnetOverloadConfig.enabled)),
+
+    /** Applies IC2 1.12.2's insulation-based shock absorption to cables. */
+    CABLE_ABSORPTION(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinTileEntityCable")
+        .addRequiredMod(TargetMods.IC2)
         .setApplyIf(() -> EnetOverloadConfig.enabled));
 
     private final MixinBuilder builder;

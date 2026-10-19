@@ -33,6 +33,13 @@ public final class EnetOverloadConfig {
     /** Apply electric shock damage near overloaded conductors. */
     public static boolean shocks = true;
 
+    /**
+     * When on, each injection is capped at the sink's remaining demand, matching IC2 Experimental
+     * 1.12.2's packet sizing. Off by default because it changes how much energy every machine receives
+     * and how much is returned to sources (a delivery change, not just an overload rule).
+     */
+    public static boolean demandCapped = false;
+
     private EnetOverloadConfig() {}
 
     public static void synchronizeConfiguration(File configFile) {
@@ -63,6 +70,14 @@ public final class EnetOverloadConfig {
             CATEGORY,
             true,
             "Living entities near an overloaded cable take electric shock damage.");
+
+        demandCapped = configuration.getBoolean(
+            "enableDemandCappedPackets",
+            CATEGORY,
+            false,
+            "Cap each injection at the sink's remaining demand (IC2 Experimental 1.12.2 packet sizing). "
+                + "This changes how much energy every machine receives and how much is returned to sources, "
+                + "so it is off by default.");
 
         if (configuration.hasChanged()) {
             configuration.save();

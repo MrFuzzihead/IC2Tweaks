@@ -12,6 +12,7 @@ import net.minecraft.world.World;
 
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
 
+import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import ic2.api.energy.EnergyNet;
@@ -33,6 +34,10 @@ import ic2.core.energy.EnergyNetLocal;
  * per entity along one energy path and sums across paths; 1.7.10 has no path data, so this pass takes
  * the maximum across all conductors (treating the tick as a single path). That is exact for a single
  * circuit and conservative for several independent circuits near the same entity.
+ * <p>
+ * The handler runs at {@link EventPriority#LOW} so it is dispatched after IC2's own {@code NORMAL}
+ * world-tick handler and therefore reads the same tick's {@code NodeStats} rather than the previous
+ * tick's.
  */
 public final class EnetCableEffects {
 
@@ -43,7 +48,7 @@ public final class EnetCableEffects {
         this.registry = registry;
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOW)
     public void onWorldTick(TickEvent.WorldTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;

@@ -67,6 +67,25 @@ public final class EnetOverloadMath {
         return shockDamageFromEnergy(shockEnergy(throughput, absorption));
     }
 
+    /**
+     * Caps an injection at the sink's remaining demand, mirroring IC2 Experimental 1.12.2's
+     * {@code amount = min(offer - loss, demand)} packet sizing. Degenerate inputs are treated as
+     * "no cap" so a broken {@code getDemandedEnergy()} can never suppress delivery silently.
+     *
+     * @param amount the amount the energy net wants to inject
+     * @param demand the sink's remaining demand ({@code getDemandedEnergy()})
+     * @return the amount to inject
+     */
+    public static double clampToDemand(double amount, double demand) {
+        if (Double.isNaN(amount) || amount <= 0) {
+            return 0D;
+        }
+        if (Double.isNaN(demand)) {
+            return amount;
+        }
+        return Math.max(0D, Math.min(amount, demand));
+    }
+
     private static boolean isUsableLimit(double limit) {
         return limit > 0 && !Double.isNaN(limit) && !Double.isInfinite(limit);
     }
