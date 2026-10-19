@@ -715,10 +715,12 @@ runtime and future pack updates; re-run the scanner before the Phase 4 default f
 
 ---
 
-## 12. Phase 1 implementation status
+## 12. Implementation status (Phases 1–2)
 
-Implemented on `feature-ENetRefactor`, pure Java, **no runtime behavior change** (nothing is registered with
-Forge and no config key is read yet).
+### 12.1 Phase 1 — pure core
+
+Phase 1 was pure Java with no runtime behavior change; Phase 2 below wires it into the live net behind a
+default-off flag.
 
 | Area | Class | Port of |
 |---|---|---|
@@ -743,14 +745,47 @@ Tests: 20 new (`PacketMathTest` 5, `PacketGridTest` 15)
 covering tier/power boundaries, effective-packet accounting, min-loss path selection, direct paths,
 loss-adjusted delivery, demand caps, full/partial rejection, melt/shock/suppression, explosion without
 conductor overload, insulation strip, per-path suppression with two sources, multi-packet spreading,
-node stats, `roundLossDown`, the source-to-source composition quirk, and an inactive grid. All 31 project
-tests pass; `./gradlew build` is green.
+node stats, `roundLossDown`, the source-to-source composition quirk, and an inactive grid.
 
-Deferred to Phase 2: building the graph from a live `Grid`, per-tick inputs from tiles, direction mapping,
-entity shock aggregation/application (max per path per entity, sum across paths), actual
-remove/strip/explode application, config keys, stats overrides, mixins and the conflict plugin. The literal
-1.12.2 source-to-source composition (`loss -= link.getLoss()`, junction conductor omitted) is replicated
-and pinned by a test; see §2.5.
+The literal 1.12.2 source-to-source composition (`loss -= link.getLoss()`, junction conductor omitted) is
+replicated and pinned by a test; see §2.5.
+
+### 12.2 Phase 2 — live adapter and gated mixins
+
+Delivered on this branch, still **default-off** (`enablePacketModel=false`):
+
+* **`ic2/core/energy/Ic2TweaksPacketModel`** — builds the pure graph from a live `Grid` (nodes, links,
+  conductor thresholds, sub-tile bounds), attaches per-grid state through the `Grid` mixin, caps and shares
+  source offers through `PacketOfferLedger`, supplies sink demand/tier, maps handler directions and
+  `injectEnergy`/`drawEnergy`, applies melt/strip/explode/shock decisions, and serves
+  `getNodeStats`/`getTotalEnergyEmitted`/`getTotalEnergySunken` from the packet paths.
+* **`MixinGridPacketModel`** — `invalidate` drops cached state; `startCalculation` and
+  `prepareCalculation` are cancelled while packet mode is active (no upfront source draw, no async linear
+  solve, no duplicate getter calls); exposes `PacketGridStateHolder` (raw node map + state) to the adapter.
+* **`MixinEnergyNetLocalPacketModel`** — replaces `processChanges` with the packet tick (the only
+  `locked == false` window), clears the now-unused legacy `changes`/`removedTiles`, and overrides the three
+  stat methods.
+* **Config** — `enablePacketModel`, `packetModelRoundLossDown`, `packetModelTierVoltage`; legacy mixins are
+  gated off in packet mode, `EnetCableEffects`/`EnetOverload` keep a runtime guard, and
+  `EnetOverload.explodePacketTile` implements 1.12.2's per-sub-tile explosion/handler order.
+* **Tests** — seven new (source-offer cap, `NodeStats` voltage mapping, cross-grid offer ledger, two-source
+  non-aggregation, two-path cable max-not-sum, and a real `Grid`/`Tile`/`Node` graph-mapping test against
+  fake IC2 tiles), **38 total**, `./gradlew build` green.
+* **Dedicated-server smoke** — `enablePacketModel=true`: GTNHMixins logs the legacy mixins as not loaded and
+  both packet mixins as loaded, startup logs `Energy-net model: packet (1.12.2-style)`, server reaches
+  `Done` with no mixin or tick errors. `false`: the inverse (packet mixins skipped, legacy loaded).
+
+Behavior notes for validation:
+
+* State is rebuilt on the first tick after any `Grid.invalidate`; a grid removed by another grid's effects
+  is skipped via an `EnergyNetLocal.grids` membership check.
+* Source offers are capped once per tile (`min(offered, powerFromTier(tier) × packets)`) and shared across
+  the grids the tile feeds; the adapter draws only the used amount.
+* `getNodeStats` is read-only and returns zeros until the first packet tick (no lazy rebuild on the stats
+  path); client-side stats remain zero, as before.
+* EnergyControl is the only pack mod that modifies cabling/storage internals (see §11.6); its storage
+  display is the first in-game canary.
+* The 1.7.10 loss constants still come from the live graph; §10.1 remains pending.
 
 ---
 
@@ -768,7 +803,9 @@ or paths**:
 * Machine explosions collect `sink -> max offending packet` and compare it to the sink tier; multiple paths to
   one machine do not add up.
 
-So the 2×BatBox→LV false explosion and the junction false melt disappear once packet mode is active. Physical
+So the 2×BatBox→LV false explosion and the junction false melt disappear once packet mode is active;
+`PacketGridTest.twoSourcesDoNotAggregateForExplosion` and `cableOnTwoPathsUsesMaxNotSum` pin exactly those
+cases. Physical
 energy delivered by several paths still adds in the machine's buffer (that is real energy, not an overload
 trigger), and a cable's actual throughput still sums physically; only the *fault checks* are per packet,
 exactly like 1.12.2.

@@ -37,16 +37,20 @@ that changes to IC2 itself can be shipped and versioned independently.
 
 | Option | Default | Description |
 | ------ | ------- | ----------- |
-| `enableEnetOverload` | `true` | Master switch. When on, the mixins are applied and IC2's `misc/useLinearTransferModel` is forced to `true` (ignoring `IC2.ini`) |
+| `enableEnetOverload` | `true` | Master switch. Legacy mode forces IC2's `misc/useLinearTransferModel` to `true`; packet mode replaces the distribution with the 1.12.2 packet calculator instead |
+| `enablePacketModel` | `false` | Experimental 1.12.2 packet/path calculator. When on, melt/shock/explosion checks use each path's own packet (no aggregation), the legacy per-node passes are disabled, and the `useLinearTransferModel` override is skipped. Requires a restart |
+| `packetModelRoundLossDown` | `false` | Packet model only: floor each path's accumulated loss, mirroring IC2 1.12.2's `misc/roundEnetLoss` |
+| `packetModelTierVoltage` | `false` | Packet model only: report 1.12.2's raw tier index from `NodeStats.getVoltage()` instead of the rated tier voltage |
 | `enableEnetExplosions` | `true` | Machines explode when they accept a packet above their tier's voltage |
 | `enableEnetCableMeltdown` | `true` | Cables melt when their carried energy exceeds the conductor breakdown energy |
 | `enableEnetShocks` | `true` | Living entities near an overloaded cable take electric shock damage |
 | `enableDemandCappedPackets` | `false` | Cap each injection at the sink's remaining demand (IC2 1.12.2 packet sizing). Off because it changes how much energy every machine receives |
 
-Because the overload system changes global IC2 behaviour (and enables IC2's experimental lossy energy
-model), it is **on by default**; set `enableEnetOverload=false` to disable it and restore stock IC2
-behaviour. Cable meltdown and shocks only work while the linear transfer model is active, which the
-master switch forces.
+Because the overload system changes global IC2 behaviour, it is **on by default**; set
+`enableEnetOverload=false` to disable it and restore stock IC2 behaviour. The default **legacy** model
+enables IC2's experimental lossy model; the opt-in **packet** model (`enablePacketModel=true`, restart
+required) replaces the per-node distribution with the 1.12.2 path/packet calculator, so fault checks use
+each path's packet instead of sums across sources (the gap-1 fix) and the linear model is left alone.
 
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
@@ -56,7 +60,11 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   loss), and a source that drops below its output packet size (32 EU/t for a BatBox) stops emitting,
   stranding the remainder.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
-  upgrades (roughly 6+ on an MFSU) draw almost no power.
+  upgrades (roughly 6+ on an MFSU) draw almost no power. This is legacy-only; the packet model does not
+  derive sink resistance from tier.
+- The packet model is experimental: `NodeStats` values are packet-based, and `getVoltage()` reports rated
+  volts unless `packetModelTierVoltage=true`; the mixins must be selected at startup (config change
+  requires a restart).
 - Cable shock sensitivity: bare cables are graded (tin 8, copper/gold/HV 32) and insulated cables are
   shock-safe at any load — they only arc while they overload and melt. This differs from IC2 1.12.2's
   per-layer table because 1.7.10's 2x/3x insulated gold/HV items are remapped to a single layer on
@@ -86,6 +94,7 @@ Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
 - `enableEnetOverload` — the master switch
+- `energy model` — `legacy per-node` or `packet (1.12.2)`; packet mode also prints its round-loss/tier-voltage options
 - `useLinearTransferModel` and the raw `IC2.ini` value — proves the override forced the linear model
 - the `enableEnet*` sub-toggles
 - how many conductors are registered in the current world

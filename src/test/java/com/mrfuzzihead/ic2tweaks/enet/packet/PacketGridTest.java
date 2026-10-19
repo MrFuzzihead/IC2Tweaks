@@ -374,6 +374,62 @@ class PacketGridTest {
             1e-9D);
     }
 
+    @Test
+    void twoSourcesDoNotAggregateForExplosion() {
+        PacketGraph.Builder builder = PacketGraph.builder();
+        int sourceA = builder.source(0);
+        int sourceB = builder.source(1);
+        int sink = builder.sink(2);
+        builder.link(sourceA, sink, 0.2D);
+        builder.link(sourceB, sink, 0.2D);
+
+        PacketGrid grid = new PacketGrid(builder.build(), false);
+        grid.rebuild();
+        PacketInputs inputs = new PacketInputs(3);
+        inputs.setSource(sourceA, 32.0D, 1);
+        inputs.setSource(sourceB, 32.0D, 1);
+        inputs.setSink(sink, 1000.0D, 1);
+        Recorder recorder = new Recorder();
+
+        PacketTickResult result = grid.tick(inputs, recorder, new Random(0), false);
+
+        // Two 32 EU/t packets reach the same tier-1 sink; 64 aggregated would explode, 32 per packet must not.
+        assertEquals(2, recorder.injections.size());
+        assertTrue(result.sinksToExplode.isEmpty());
+    }
+
+    @Test
+    void cableOnTwoPathsUsesMaxNotSum() {
+        PacketGraph.Builder builder = PacketGraph.builder();
+        int sourceA = builder.source(0);
+        int sourceB = builder.source(1);
+        int cable = builder.conductor(2, 33.0D, 5.0D);
+        int sinkA = builder.sink(3);
+        int sinkB = builder.sink(4);
+        builder.link(sourceA, cable, 0.1D);
+        builder.link(cable, sinkA, 0.1D);
+        builder.link(sourceB, cable, 0.1D);
+        builder.link(cable, sinkB, 0.1D);
+
+        PacketGrid grid = new PacketGrid(builder.build(), false);
+        grid.rebuild();
+        PacketInputs inputs = new PacketInputs(5);
+        inputs.setSource(sourceA, 32.0D, 1);
+        inputs.setSource(sourceB, 32.0D, 1);
+        inputs.setSink(sinkA, 1000.0D, 1);
+        inputs.setSink(sinkB, 1000.0D, 1);
+        Recorder recorder = new Recorder();
+
+        PacketTickResult result = grid.tick(inputs, recorder, new Random(0), false);
+
+        // Both sources' packets traverse the same 33-breakdown cable; each path sees 32, not the 64 sum.
+        assertTrue(result.conductorsToRemove.isEmpty());
+        assertTrue(result.sinksToExplode.isEmpty());
+        assertEquals(2, result.shockContributions.size());
+        assertEquals(27, result.shockContributions.get(0).energy);
+        assertEquals(27, result.shockContributions.get(1).energy);
+    }
+
     private static PacketGraph line(double firstLoss, double secondLoss, double breakdown, double absorption) {
         PacketGraph.Builder builder = PacketGraph.builder();
         int source = builder.source(0);

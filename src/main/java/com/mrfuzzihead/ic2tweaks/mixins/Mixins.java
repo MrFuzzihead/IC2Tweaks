@@ -15,17 +15,29 @@ import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
  */
 public enum Mixins implements IMixins {
 
-    /** Forces {@code EnergyNetLocal.useLinearTransferModel} to true, ignoring IC2.ini. */
+    /** Forces {@code EnergyNetLocal.useLinearTransferModel} to true, ignoring IC2.ini (legacy mode only). */
     ENET_LINEAR_MODEL(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinEnergyNetLocalLinearModel")
         .addRequiredMod(TargetMods.IC2)
-        .setApplyIf(() -> EnetOverloadConfig.enabled)),
+        .setApplyIf(() -> EnetOverloadConfig.enabled && !EnetOverloadConfig.packetModel)),
 
-    /** Captures {@code injectEnergy} calls and explodes over-tier machines. */
+    /** Captures {@code injectEnergy} calls and explodes over-tier machines (legacy mode only). */
     ENET_OVERLOAD(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinEnergyNetLocalOverload")
         .addRequiredMod(TargetMods.IC2)
-        .setApplyIf(() -> EnetOverloadConfig.enabled)),
+        .setApplyIf(() -> EnetOverloadConfig.enabled && !EnetOverloadConfig.packetModel)),
+
+    /** Attaches packet-model state to each IC2 grid and disables the legacy linear calculation. */
+    ENET_PACKET_GRID(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinGridPacketModel")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> EnetOverloadConfig.enabled && EnetOverloadConfig.packetModel)),
+
+    /** Replaces the main-thread energy application/stat methods while packet mode is active. */
+    ENET_PACKET_LOCAL(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinEnergyNetLocalPacketModel")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> EnetOverloadConfig.enabled && EnetOverloadConfig.packetModel)),
 
     /** Adds the cable's energy loss to its item tooltip. */
     ITEM_CABLE_TOOLTIP(new MixinBuilder().setPhase(Phase.LATE)

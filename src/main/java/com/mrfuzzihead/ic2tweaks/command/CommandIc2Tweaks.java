@@ -60,6 +60,10 @@ public class CommandIc2Tweaks extends CommandBase {
         send(sender, "enableEnetOverload: " + colour(EnetOverloadConfig.enabled) + EnetOverloadConfig.enabled);
         send(
             sender,
+            "energy model: " + colour(EnetOverloadConfig.packetModel)
+                + (EnetOverloadConfig.packetModel ? "packet (1.12.2)" : "legacy per-node"));
+        send(
+            sender,
             "useLinearTransferModel: " + colour(
                 linear) + linear + EnumChatFormatting.GRAY + " (IC2.ini: " + rawLinear + ")");
         send(
@@ -71,6 +75,13 @@ public class CommandIc2Tweaks extends CommandBase {
                 + EnetOverloadConfig.shocks
                 + " demandCapped="
                 + EnetOverloadConfig.demandCapped);
+        if (EnetOverloadConfig.packetModel) {
+            send(
+                sender,
+                "packetModel: roundLossDown=" + EnetOverloadConfig.packetModelRoundLossDown
+                    + " tierVoltage="
+                    + EnetOverloadConfig.packetModelTierVoltage);
+        }
         send(sender, "conductors registered in this world: " + conductorCount(sender));
     }
 

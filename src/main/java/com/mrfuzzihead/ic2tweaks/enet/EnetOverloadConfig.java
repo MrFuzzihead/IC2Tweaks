@@ -24,6 +24,22 @@ public final class EnetOverloadConfig {
      */
     public static boolean enabled = true;
 
+    /**
+     * Experimental 1.12.2-style packet calculator. Off by default: when off, the legacy per-node effects
+     * path runs exactly as before. When on, the packet mixins replace the distribution tick and the legacy
+     * effect passes are not applied.
+     */
+    public static boolean packetModel = false;
+
+    /** Mirrors 1.12.2's {@code misc/roundEnetLoss}: floor each path's accumulated loss. */
+    public static boolean packetModelRoundLossDown = false;
+
+    /**
+     * When on, {@code NodeStats.getVoltage()} reports 1.12.2's raw tier index instead of the rated tier
+     * voltage (32/128/512/...). Rated volts are the default for 1.7.10 UI/addon compatibility.
+     */
+    public static boolean packetModelTierVoltage = false;
+
     /** Explode machines that accept a packet above their tier's voltage. */
     public static boolean explosions = true;
 
@@ -50,8 +66,34 @@ public final class EnetOverloadConfig {
             CATEGORY,
             true,
             "Master switch for the global IC2 energy-net overload system (IC2 Experimental 1.12.2 style). "
-                + "When enabled, this mod forces IC2's misc/useLinearTransferModel to true (ignoring IC2.ini) "
-                + "and applies over-voltage explosions, cable meltdown and shocks to every IC2 machine and cable.");
+                + "When enabled, this mod applies over-voltage explosions, cable meltdown and shocks to every IC2 "
+                + "machine and cable. Without enablePacketModel it forces IC2's misc/useLinearTransferModel to true "
+                + "(ignoring IC2.ini); with enablePacketModel it replaces the distribution with the packet calculator "
+                + "instead.");
+
+        packetModel = configuration.getBoolean(
+            "enablePacketModel",
+            CATEGORY,
+            false,
+            "Experimental: replace IC2's per-node energy distribution with the 1.12.2 packet/path calculator. "
+                + "Fault checks (melt/shock/explosion) then use each path's own packet instead of per-node aggregates, "
+                + "so multiple sources no longer add up. When enabled, the legacy per-node effect passes and the "
+                + "useLinearTransferModel override are disabled. Requires a restart.");
+
+        packetModelRoundLossDown = configuration.getBoolean(
+            "packetModelRoundLossDown",
+            CATEGORY,
+            false,
+            "Packet model only: floor each energy path's accumulated loss, mirroring IC2 1.12.2's "
+                + "misc/roundEnetLoss option.");
+
+        packetModelTierVoltage = configuration.getBoolean(
+            "packetModelTierVoltage",
+            CATEGORY,
+            false,
+            "Packet model only: report 1.12.2's raw tier index (1, 2, 3, ...) from NodeStats.getVoltage() "
+                + "instead of the rated tier voltage (32, 128, 512, ...). Rated volts are the default for 1.7.10 "
+                + "UI and addon compatibility.");
 
         explosions = configuration.getBoolean(
             "enableEnetExplosions",

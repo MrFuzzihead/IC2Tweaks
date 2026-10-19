@@ -68,6 +68,33 @@ public final class PacketMath {
     }
 
     /**
+     * 1.12.2's {@code runSyncStep(enet)} cap: a source may offer at most one tier-power packet per
+     * packet slot. Without this cap an over-offering single-packet 1.7.10 source could push a too-large
+     * packet down one path and trip a threshold.
+     */
+    public static double capOffer(double offer, int tier, int packets) {
+        if (!(offer > 0.0D) || packets <= 0) {
+            return 0.0D;
+        }
+        double power = powerFromTier(tier);
+        if (!(power > 0.0D)) {
+            return 0.0D;
+        }
+        return Math.min(offer, power * packets);
+    }
+
+    /**
+     * Maps a packet tier to the value exposed through {@code NodeStats.getVoltage()}. Rated volts are the
+     * default (1.7.10 UI/addon compatibility); {@code rawTier} exposes 1.12.2's tier index instead.
+     */
+    public static double nodeStatsVoltage(int tier, boolean rawTier) {
+        if (tier <= 0) {
+            return 0.0D;
+        }
+        return rawTier ? tier : powerFromTier(tier);
+    }
+
+    /**
      * Thrown by {@link #tierFromPower} for an infinite packet: the model never treats it as a valid
      * explosion tier.
      */

@@ -67,4 +67,32 @@ class PacketMathTest {
         assertEquals(false, PacketMath.isUsableTier(Integer.MAX_VALUE));
         assertEquals(true, PacketMath.isUsableTier(1));
     }
+
+    @Test
+    void capOfferMatches1212RunSyncStep() {
+        // one tier-1 packet is 32 EU/t
+        assertEquals(32.0D, PacketMath.capOffer(1000.0D, 1, 1), 1e-9D);
+        assertEquals(64.0D, PacketMath.capOffer(1000.0D, 1, 2), 1e-9D);
+        assertEquals(512.0D, PacketMath.capOffer(1000.0D, 3, 1), 1e-9D);
+        // under the cap, the offer is untouched
+        assertEquals(10.0D, PacketMath.capOffer(10.0D, 1, 1), 1e-9D);
+        // degenerate inputs never produce energy
+        assertEquals(0.0D, PacketMath.capOffer(0.0D, 1, 1), 1e-9D);
+        assertEquals(0.0D, PacketMath.capOffer(-1.0D, 1, 1), 1e-9D);
+        assertEquals(0.0D, PacketMath.capOffer(100.0D, 1, 0), 1e-9D);
+        assertEquals(0.0D, PacketMath.capOffer(100.0D, -1, 1), 1e-9D);
+        assertEquals(0.0D, PacketMath.capOffer(Double.NaN, 1, 1), 1e-9D);
+    }
+
+    @Test
+    void nodeStatsVoltageSupportsRatedAndTierModes() {
+        assertEquals(0.0D, PacketMath.nodeStatsVoltage(0, false), 1e-9D);
+        assertEquals(0.0D, PacketMath.nodeStatsVoltage(-1, false), 1e-9D);
+        // default: rated volts for 1.7.10 UI/addon compatibility
+        assertEquals(32.0D, PacketMath.nodeStatsVoltage(1, false), 1e-9D);
+        assertEquals(512.0D, PacketMath.nodeStatsVoltage(3, false), 1e-9D);
+        // strict 1.12.2 mode: the tier index
+        assertEquals(1.0D, PacketMath.nodeStatsVoltage(1, true), 1e-9D);
+        assertEquals(3.0D, PacketMath.nodeStatsVoltage(3, true), 1e-9D);
+    }
 }
