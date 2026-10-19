@@ -615,9 +615,12 @@ source and sink, so a cable-less machine-to-machine link is `0.4 Ω`. With a Bat
 leftover is base IC2: `TileEntityElectricBlock.getOfferedEnergy()` returns 0 below `output` (32), so the
 sender stops. `510 receiver shortfall = 495 lost + 15 stranded`.
 
-This is faithful to 1.12.2 (`Node.getInnerLoss()` is also 0.4 there, and `EnergyCalculatorLeg.emit`
-charges `amount - rejected + path.loss`). **No code change**; documented in the README. The loss is
-LV-heavy because `R_sink` scales with tier (≈ 1.2 % at tier 1, ≈ 0.3 % at tier 2).
+1.12.2 applies the same *shape* of loss (`EnergyCalculatorLeg.emit` charges
+`amount - rejected + path.loss`) but with different constants: `grid.Node.getInnerLoss()` is **0.002**
+for sources/sinks there (`EnergyNetSettings.nonConductorResistance = 0.001`), so a direct
+BatBox→BatBox run loses ≈2.5 EU rather than ≈495. The `0.4` value is a 1.7.10 constant (corrected
+after decompiling 1.12.2 for the packet-model spike, §14). **No code change**; documented in the README.
+The loss is LV-heavy because `R_sink` scales with tier (≈ 1.2 % at tier 1, ≈ 0.3 % at tier 2).
 
 ### 11.3 Cable loss tooltips
 
@@ -649,8 +652,9 @@ moved into the same pass. Two earlier assessments are corrected here:
 - **Gap 2 (insulation stripping) is not a gap.** 1.12.2's `getInsulationBreakdownEnergy()` is also
   `9001`, and every conductor breakdown is at most `8193`, so `cablesToStrip` can never populate there
   either. Doing nothing is parity.
-- **Gap 4 (`conductorOverload` suppression)** was later removed upstream: the modern
-  `EnergyCalculatorUnified` has no suppression at all, so letting both effects fire is defensible.
+- **Gap 4 (`conductorOverload` suppression)** was removed in the post-1.12.2 calculator rewrite, so
+  letting both effects fire is defensible on the legacy per-node path; the 1.12.2 packet system
+  (`EnergyCalculatorLeg`, the target of §14) *does* suppress, and the packet-model spike restores it.
 
 ### 12.1 Scorecard
 
@@ -745,3 +749,15 @@ Still open on the current system:
 - gap 11 — `NodeStats` one-tick staleness (low value);
 - gap 13 — IC2 linear-model tier starvation (inherent to forcing the model);
 - gap 15 — `accepted` vs `amount` for the explosion test (equivalent for all-or-nothing 1.7.10 sinks).
+
+---
+
+## 14. Packet-model spike (gap 1)
+
+The per-packet calculator is designed in `PACKET_MODEL_SPIKE.md` (branch `feature-ENetRefactor`). It is
+based on the decompiled 1.12.2 `ic2.core.energy.leg.EnergyCalculatorLeg`/`EnergyPath` from
+`industrialcraft-2-2.8.222-ex112.jar` and a port onto 1.7.10's existing `Grid`/`Node`/`NodeLink`/`Tile`
+graph, and it supersedes the §12.4 sketch with a concrete architecture, fidelity mapping, pitfalls,
+downstream-mod impact analysis and a phased plan. Two corrections to this document came out of that
+work: 1.12.2's source/sink inner loss is 0.002, not 0.4 (§11.2), and `EnergyCalculatorUnified` does not
+exist in 2.8.222 — the Leg calculator *is* the 1.12.2 packet system (§2.1, §12.2).
