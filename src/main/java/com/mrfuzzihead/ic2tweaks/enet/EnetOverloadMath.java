@@ -68,6 +68,20 @@ public final class EnetOverloadMath {
     }
 
     /**
+     * Shock threshold for a conductor that is being removed as overloaded this tick. Insulated cables
+     * are shock-safe at their rated load, so their threshold only drops to the conductor breakdown (the
+     * excess that is actually melting them); bare cables already have a lower absorption and are
+     * unaffected.
+     *
+     * @param absorption {@code IEnergyConductor.getInsulationEnergyAbsorption()}
+     * @param breakdown  {@code IEnergyConductor.getConductorBreakdownEnergy()}
+     * @return the threshold to use
+     */
+    public static double overloadShockThreshold(double absorption, double breakdown) {
+        return Math.min(absorption, breakdown);
+    }
+
+    /**
      * Caps an injection at the sink's remaining demand, mirroring IC2 Experimental 1.12.2's
      * {@code amount = min(offer - loss, demand)} packet sizing. Degenerate inputs are treated as
      * "no cap" so a broken {@code getDemandedEnergy()} can never suppress delivery silently.

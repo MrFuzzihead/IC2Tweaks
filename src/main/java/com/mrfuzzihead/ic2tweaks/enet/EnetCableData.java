@@ -61,39 +61,32 @@ public final class EnetCableData {
     }
 
     /**
-     * Shock protection of an IC2 cable, using IC2 Experimental 1.12.2's rule:
-     * {@code getPowerFromTier(insulation)} for tin and {@code getPowerFromTier(insulation + 1)} for
-     * every other cable, with cables that cannot be insulated immune. This makes bare tin deliberately
-     * the most sensitive common cable (8 EU/t) while bare copper/gold/HV sit at 32 EU/t.
+     * Shock protection of an IC2 cable.
+     * <p>
+     * IC2 1.12.2 derives this from the insulation count ({@code getPowerFromTier(insulation + (tin ? 0
+     * : 1))}), which makes "fully insulate the cable" the way to be safe at its rated load. 1.7.10
+     * cannot support that: the 2x/3x insulated gold/HV items exist but {@code TileEntityCable.onLoaded()}
+     * remaps cable types 4 and 7/8 back to a single layer as soon as they are placed, and
+     * {@code tryAddInsulation()} has no path to them. A single layer would leave gold at 128 and HV at
+     * 128 against capacities of 512 and 2048, so those cables could never be made shock-safe at rated
+     * load.
+     * <p>
+     * The 1.7.10-appropriate rule is therefore: bare cables keep their graded thresholds (tin 8,
+     * copper/gold/HV 32) and everything insulated is shock-safe unless it actually overloads and melts —
+     * {@code EnetCableEffects} lowers the threshold to the conductor breakdown for a melting cable.
      *
      * @param meta cable item/block metadata
      * @return the insulation energy absorption in EU/t, or {@link #NO_SHOCK}
      */
     public static double insulationEnergyAbsorption(int meta) {
         switch (meta) {
-            case 9: // glass fibre
-            case 11: // detector
-            case 12: // splitter
-                return NO_SHOCK;
-            case 10: // tin, 0 layers
+            case 10: // bare tin
                 return tierPower(0);
-            case 13: // insulated tin
-            case 14: // legacy insulated tin
+            case 1: // bare copper
+            case 2: // bare gold
+            case 5: // bare HV
                 return tierPower(1);
-            case 1: // copper, 0 layers
-            case 2: // gold, 0 layers
-            case 5: // HV, 0 layers
-                return tierPower(1);
-            case 0: // insulated copper
-            case 3: // insulated gold
-            case 6: // insulated HV
-                return tierPower(2);
-            case 4: // 2x insulated gold
-            case 7: // 2x insulated HV
-                return tierPower(3);
-            case 8: // 3x insulated HV
-                return tierPower(4);
-            default:
+            default: // insulated copper/gold/HV/tin, glass fibre, detector, splitter, unknown
                 return NO_SHOCK;
         }
     }

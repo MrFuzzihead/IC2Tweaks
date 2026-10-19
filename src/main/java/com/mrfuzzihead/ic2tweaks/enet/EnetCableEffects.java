@@ -99,6 +99,7 @@ public final class EnetCableEffects {
             IEnergyConductor conductor = (IEnergyConductor) te;
             NodeStats stats = EnergyNet.instance.getNodeStats(te);
             double throughput = Math.max(stats.getEnergyIn(), stats.getEnergyOut());
+            boolean melting = false;
 
             if (EnetOverloadConfig.cableMeltdown
                 && EnetOverloadMath.exceedsBreakdown(throughput, conductor.getConductorBreakdownEnergy())) {
@@ -112,6 +113,7 @@ public final class EnetCableEffects {
                     te.zCoord,
                     throughput,
                     conductor.getConductorBreakdownEnergy());
+                melting = true;
                 melted.add(conductor);
             } else if (throughput > conductor.getInsulationBreakdownEnergy()) {
                 // getInsulationBreakdownEnergy() is 9001 in 1.7.10 and removeInsulation() is a no-op,
@@ -120,7 +122,15 @@ public final class EnetCableEffects {
             }
 
             if (EnetOverloadConfig.shocks) {
-                double energy = EnetOverloadMath.shockEnergy(throughput, conductor.getInsulationEnergyAbsorption());
+                double absorption = conductor.getInsulationEnergyAbsorption();
+                if (melting) {
+                    // Insulated cables are shock-safe at their rated load; they only arc when they
+                    // actually overload and melt. Bare cables are unaffected because their absorption
+                    // is already below their breakdown.
+                    absorption = EnetOverloadMath
+                        .overloadShockThreshold(absorption, conductor.getConductorBreakdownEnergy());
+                }
+                double energy = EnetOverloadMath.shockEnergy(throughput, absorption);
                 if (energy > 0) {
                     collectShockEnergy(world, te, energy, shockEnergy);
                 }

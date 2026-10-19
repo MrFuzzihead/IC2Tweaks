@@ -537,10 +537,10 @@ category of `config/ic2tweaks.cfg`.
 - [ ] Standing next to an overloaded copper cable (MFSU → copper → LV) deals electric damage on the
       tick it melts as well as on the preceding ticks (meltdown and shock are computed in the same
       pass); the death message is IC2's electric source.
-- [ ] Absorption follows IC2 1.12.2's insulation formula: bare tin shocks above 8 EU/t, bare
-      copper/gold/HV above 32 EU/t; insulated copper/gold/HV above 128 EU/t, 2x insulated above 512,
-      3x insulated HV above 2048; glass fibre, detector and splitter never shock. (A BatBox circuit at
-      ~20 EU/t therefore shocks on bare tin and bare copper alike.)
+- [ ] Bare cables shock above their graded thresholds: tin above 8 EU/t, copper/gold/HV above 32 EU/t.
+- [ ] Insulated cables never shock at load; an insulated cable that overloads past its breakdown shocks
+      on the tick it melts (`ceil((throughput - breakdown) / 64)`). Glass fibre, detector and splitter
+      never shock.
 - [ ] Shock damage is applied once per tick per entity, not once per cable tile: a long run must not
       out-damage a single tile at the same throughput (max-per-entity accumulation, gap 6 closed).
 - [ ] `enableEnetShocks=false`: no damage.
@@ -601,10 +601,9 @@ in 1.12.2.
 **Verdict / decision.** The observation matches 1.12.2's design rather than the port's current table
 (our copper is more sensitive than our tin). If the in-game comparison really was bare tin vs bare
 copper in the same circuit it needs a repro; the likely explanations are bare tin vs *insulated* copper,
-or different circuit throughputs. Absorption parity is **implemented** (round 2, §13):
-`MixinTileEntityCable` now overrides `getInsulationEnergyAbsorption()` with the 1.12.2 formula, so bare
-tin (8) is the most sensitive common cable, bare copper/gold/HV sit at 32, and insulated cables scale
-by layer.
+or different circuit throughputs. Absorption is **implemented** (round 2, §13): bare tin is the most
+sensitive common cable (8 EU/t), bare copper/gold/HV sit at 32 EU/t, and insulated cables are shock-safe
+unless they overload and melt. (1.7.10's 2x/3x insulated gold/HV items are non-functional — see §13.)
 
 ### 11.2 Missing ~495 EU on a direct BatBox → BatBox connection
 
@@ -657,7 +656,7 @@ moved into the same pass. Two earlier assessments are corrected here:
 
 | Dimension | Parity | Notes |
 |---|---|---|
-| Effect rules (what melts / explodes / shocks) | ~98% | Absorption parity and the graceful hooks landed in round 2 (§13); only suppression (gap 4) is missing. |
+| Effect rules (what melts / explodes / shocks) | ~98% | Absorption (1.7.10-adapted) and the graceful hooks landed in round 2 (§13); only suppression (gap 4) is missing. |
 | Effect math (thresholds, damage, blast) | ~95% | `ceil(energy / 64)`, `capacity + 1` breakdown, tier power, 2.5 / 0.75 blast all match. |
 | Tick coherence | ~90% | The cable pass runs at `EventPriority.LOW`, so it reads the same tick's stats as IC2's handler; it is still a separate pass from machine explosions. |
 | Per-packet fidelity (junctions, multi-source, multi-packet) | ~50% | Gap 1 knocks on to melt/shock/explosion values and false positives. |
@@ -677,7 +676,7 @@ moved into the same pass. Two earlier assessments are corrected here:
 | 11 | `NodeStats` from path data, same tick | `lastNodeStats` = `current · V`, one-tick stale | Missing | Medium |
 | 12 | effects run inside the calculator, one pass per grid tick | cables run at `EventPriority.LOW` (same-tick stats) but are still a separate pass | Partial | Low |
 | 13 | no tier-resistance starvation | high-tier machines starve | Inherent IC2 quirk | Medium (mitigation) |
-| 14 | absorption = `tierPower(insulation + (tin ? 0 : 1))`; non-insulatable types immune | `MixinTileEntityCable` overrides absorption with the 1.12.2 formula | **Closed** | — |
+| 14 | absorption = `tierPower(insulation + (tin ? 0 : 1))`; non-insulatable types immune | bare cables graded (tin 8, Cu/Au/HV 32); insulated `NO_SHOCK`, arcing only while melting | **Closed (1.7.10-adapted)** | — |
 | 15 | sink explosion on `amount` (post demand cap) | on `accepted` (`amount − returned`) | Equivalent for all-or-nothing sinks | Low |
 | 16 | multi-packet sources (`IMultiEnergySource`) | 1.7.10 has no such API | Missing (part of 1) | Structural |
 
@@ -732,7 +731,7 @@ still deferred to a separate branch.
 
 | Item | What changed | Files |
 |---|---|---|
-| Absorption parity (gap 14, finding 1) | `getInsulationEnergyAbsorption()` is overridden with IC2 1.12.2's `getPowerFromTier(insulation + (tin ? 0 : 1))` rule, non-insulatable cables immune. Bare tin (8) is now the most sensitive common cable; bare copper/gold/HV are 32; insulated cables scale 128/512/2048. | `MixinTileEntityCable`, `EnetCableData`, `EnetCableDataTest` |
+| Absorption parity (gap 14, finding 1) | `getInsulationEnergyAbsorption()` is overridden: bare cables keep the graded thresholds (tin 8; copper/gold/HV 32) and insulated cables return `NO_SHOCK`, so they only arc while they overload and melt (`EnetCableEffects` drops a melting cable's threshold to its breakdown). The full 1.12.2 per-layer table is unusable here: 1.7.10's 2x/3x insulated gold/HV are remapped to a single layer on placement (`TileEntityCable.onLoaded()`), leaving gold at 128 vs a 512 capacity. | `MixinTileEntityCable`, `EnetCableData`, `EnetOverloadMath`, `EnetCableEffects`, tests |
 | Graceful hooks (gap 3) | Added `IOverloadHandler` and `IExplosionPowerOverride`; `EnetOverload` checks them in 1.12.2 order (config → `onOverload` → `shouldExplode`/`getExplosionPower`) and builds the `ExplosionIC2` itself so the blast can be resized. Per-tile dedupe with the max offending packet mirrors 1.12.2's `sinksToExplode`. | `api/IOverloadHandler`, `api/IExplosionPowerOverride`, `EnetOverload` |
 | Demand cap (gap 5) | Opt-in `enableDemandCappedPackets` (default `false`) clamps each injection at `getDemandedEnergy()`, mirroring 1.12.2's packet sizing. Off by default because it changes delivery for every machine. | `EnetOverloadConfig`, `MixinEnergyNetLocalOverload`, `EnetOverloadMath`, `EnetOverloadMathTest` |
 | Same-tick cable stats (gap 12, partial) | The cable pass is registered at `EventPriority.LOW`, guaranteeing it is dispatched after IC2's `NORMAL` enet tick and reads the current tick's `NodeStats`. It is still a separate pass from machine explosions. | `EnetCableEffects` |

@@ -80,6 +80,18 @@ class EnetOverloadMathTest {
     }
 
     @Test
+    void overloadShockThresholdOnlyLowersInsulatedCables() {
+        // bare cables already sit below their breakdown: unchanged
+        assertEquals(8D, EnetOverloadMath.overloadShockThreshold(8, 33));
+        assertEquals(32D, EnetOverloadMath.overloadShockThreshold(32, 513));
+        // an insulated cable's infinite absorption drops to the breakdown it is melting past
+        assertEquals(513D, EnetOverloadMath.overloadShockThreshold(EnetCableData.NO_SHOCK, 513));
+        assertEquals(2049D, EnetOverloadMath.overloadShockThreshold(EnetCableData.NO_SHOCK, 2049));
+        // a finite absorption still wins when it is the lower value
+        assertEquals(128D, EnetOverloadMath.overloadShockThreshold(128, 129));
+    }
+
+    @Test
     void demandClampMirrors1122PacketSizing() {
         assertEquals(5.0D, EnetOverloadMath.clampToDemand(20, 5));
         assertEquals(20.0D, EnetOverloadMath.clampToDemand(20, 100));

@@ -17,10 +17,10 @@ that changes to IC2 itself can be shipped and versioned independently.
   While enabled it forces IC2's linear transfer model (ignoring `IC2.ini`), which is the model that
   carries physical voltage/current data. Cable items also gain an energy-loss tooltip line.
   See [Configuration](#configuration).
-- **1.12.2-parity cable rules**: shock thresholds use IC2 1.12.2's insulation formula (bare tin is the
-  most sensitive cable at 8 EU/t; insulated cables scale by layer), and TEs can opt out of or resize an
-  over-voltage blast via `com.mrfuzzihead.ic2tweaks.api.IOverloadHandler` /
-  `IExplosionPowerOverride`.
+- **1.12.2-style cable rules**: bare cables shock above their graded thresholds (tin 8 EU/t;
+  copper/gold/HV 32 EU/t), while insulated cables are shock-safe unless they actually overload and melt.
+  TEs can opt out of or resize an over-voltage blast via `com.mrfuzzihead.ic2tweaks.api.IOverloadHandler`
+  / `IExplosionPowerOverride`.
 
 ## Requirements
 
@@ -57,8 +57,10 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   stranding the remainder.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
   upgrades (roughly 6+ on an MFSU) draw almost no power.
-- Cable shock sensitivity follows IC2 1.12.2's insulation-based formula (bare tin 8, bare copper/gold/HV
-  32, insulated layers 128/512/2048; glass/detector/splitter never shock).
+- Cable shock sensitivity: bare cables are graded (tin 8, copper/gold/HV 32) and insulated cables are
+  shock-safe at any load — they only arc while they overload and melt. This differs from IC2 1.12.2's
+  per-layer table because 1.7.10's 2x/3x insulated gold/HV items are remapped to a single layer on
+  placement (`TileEntityCable.onLoaded()`), so gold/HV could never be insulated past 128 there.
 - Overload checks use 1.7.10's **per-node aggregate** values, not 1.12.2's per-source packet sizes. At a
   junction or with several sources feeding one cable, the cable can trip earlier than it would in 1.12.2,
   and two same-tier sources can trip the machine-explosion check. This is the remaining structural
