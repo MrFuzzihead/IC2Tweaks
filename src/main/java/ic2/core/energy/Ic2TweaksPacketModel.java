@@ -15,7 +15,6 @@ import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverload;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketGraph;
@@ -49,8 +48,6 @@ import ic2.core.IC2DamageSource;
  */
 public final class Ic2TweaksPacketModel {
 
-    private static boolean firstGridLogged;
-
     private Ic2TweaksPacketModel() {}
 
     public static boolean isActive() {
@@ -71,10 +68,6 @@ public final class Ic2TweaksPacketModel {
             GridState state = state(grid);
             if (state == null) {
                 continue;
-            }
-            if (!firstGridLogged) {
-                firstGridLogged = true;
-                IC2Tweaks.LOG.info("Packet model: first grid built ({} nodes)", state.graph.nodeCount());
             }
             for (int node : state.sourceNodes) {
                 Tile tile = state.tile(node);

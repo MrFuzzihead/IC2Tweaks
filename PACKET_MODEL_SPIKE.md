@@ -787,6 +787,29 @@ Behavior notes for validation:
   display is the first in-game canary.
 * The 1.7.10 loss constants still come from the live graph; §10.1 remains pending.
 
+### 12.3 Phase 3 canaries (packet mode, dedicated server)
+
+Run with `JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer` while packet mode is on. The
+developer harness (`dev/CanaryHarness`, inactive unless that system property is set) builds four IC2 rigs at
+`y=160` with storage blocks and cables, waits 80 ticks, logs `[canary] PASS/FAIL` and stops the server.
+
+Result (2026-10-19): **ALL PASS**.
+
+| Canary | Observed |
+|---|---|
+| MFSU → LV sink directly | sink exploded (`air`) |
+| MFSU → copper cable → LV sink | copper cable melted; sink **survived** (2.8.222 suppression) |
+| 2×BatBox → one LV sink | no explosion; stats `in=63.2`, `voltage=32.0` |
+| 2×BatBox → one tin cable (breakdown 33) → LV sink | no melt; cable stats `in/out=62.8`, `voltage=32.0` |
+| Cow at the overloaded tin cable | shock damage accumulated; health 0 |
+
+The aggregation canaries that motivated gap 1 are therefore validated in-game: two 32 EU/t packets do not
+add up to 64 for explosion or melt checks, and a melting cable suppresses the sink explosion.
+
+Still manual because they need specific mod/pack setups: transformer packet conversion, a machine with many
+transformer upgrades (tier-starvation fix), EnergyControl's storage display, and Hodgepodge's reactor source
+changes.
+
 ---
 
 ## 13. Residual gaps after the packet model (and the aggregation question)

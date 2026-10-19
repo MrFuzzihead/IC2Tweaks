@@ -104,6 +104,17 @@ Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 This project uses the [GTNewHorizons](https://github.com/GTNewHorizons) 1.7.10 Gradle toolchain. The
 correct JDK is provisioned automatically by Gradle — no manual Java setup required.
 
+### Canary harness (development)
+
+With packet mode enabled, run:
+
+```
+JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
+```
+
+The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It is
+inactive unless the system property is set and is not part of normal gameplay.
+
 ```bash
 git clone https://github.com/MrFuzzihead/IC2Tweaks.git
 cd IC2Tweaks

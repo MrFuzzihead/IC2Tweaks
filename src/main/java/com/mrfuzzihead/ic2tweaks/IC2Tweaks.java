@@ -45,6 +45,12 @@ public class IC2Tweaks {
         FMLCommonHandler.instance()
             .bus()
             .register(cableEffects);
+
+        if (Boolean.getBoolean("ic2tweaks.canary")) {
+            FMLCommonHandler.instance()
+                .bus()
+                .register(new com.mrfuzzihead.ic2tweaks.dev.CanaryHarness());
+        }
     }
 
     @Mod.EventHandler
