@@ -127,7 +127,10 @@ This is where gap 4 gets closed for free: suppression is a property of the path 
 
 Per grid, per source: a Dijkstra over `Node.links` (`NodeLink.loss` weights) that stops early once
 every sink has a path (`paths.size() == sinkCount`) and composes with paths already computed for
-**other sources** it reaches (source→source chaining). Each `EnergyPath` precomputes the conductor
+**other sources** it reaches (source→source chaining). That composition subtracts the connecting link's
+loss and drops the junction conductor from the composed conductor list (`reconstructPath` excludes its
+destination node); both quirks are replicated verbatim and pinned by a test. Each `EnergyPath`
+precomputes the conductor
 node list, summed loss, `targetDirection`, minima of the three conductor thresholds, and the path's
 bounding box (used for shock entity search). `EnergyNetSettings.roundLossDown` (`misc/roundEnetLoss`)
 floors losses when enabled; grids with > 2048 sources use an `ArrayDeque` instead of a priority queue.
@@ -501,7 +504,17 @@ This is a *global delivery rewrite*, so the blast radius is every IC2 energy par
 
 ---
 
-## 10. Open decisions (detailed)
+## 10. Decisions (confirmed)
+
+| # | Decision | Outcome |
+|---|---|---|
+| 1 | Loss constants | Keep 1.7.10 `0.4`/`0.2` for now; make it configurable and plan for 1.12.2 `0.002`/`0.001` to become the eventual default |
+| 2 | `NodeStats.voltage` | Rated volts by default; config to opt into raw tier; revisit later |
+| 3 | Gap 4 suppression | Match 2.8.222: suppress the sink explosion when a conductor on that path overloads |
+| 4 | Rollout | `enablePacketModel=false` through Phases 1–3, `true` at Phase 4, key retained for at least one release |
+| 5 | Gap 16 multi-packet | Implement `packetCount`/`distributeMultiple` internally now; publish an opt-in API later (Phase 4) |
+
+The analysis below records the options and reasoning behind these outcomes.
 
 ### 10.1 Loss constants — keep 1.7.10 (`0.4`/`0.2`) or port 1.12.2 (`0.002`/`0.001`)?
 
@@ -671,3 +684,42 @@ budget and must be run as a batch job, not on the fly.
 * [ ] Re-run on the secondary packs (Modrinth `FuzzCraft`, `Alone_ Modded World`).
 * [ ] Add the `IMixinConfigPlugin` conflict list once the hits are known (Phase 2/3).
 * [ ] Re-check after any packet-model code lands and again at Phase 4 before the default flip.
+
+---
+
+## 12. Phase 1 implementation status
+
+Implemented on `feature-ENetRefactor`, pure Java, **no runtime behavior change** (nothing is registered with
+Forge and no config key is read yet).
+
+| Area | Class | Port of |
+|---|---|---|
+| Graph snapshot | `enet/packet/PacketGraph` | `Grid`/`Node`/`NodeLink`/`Tile`, reduced to the fields the calculator needs |
+| Path | `enet/packet/PacketPath` | `EnergyPath` (loss, conductor list, threshold minima, bounding box, per-tick counters) |
+| Math | `enet/packet/PacketMath` | `EnergyNet.getPowerFromTier`/`getTierFromPower`, `emit`'s effective amount, shock damage |
+| Calculator | `enet/packet/PacketGrid` | `updateCache` (Dijkstra per source + source-to-source composition + `roundLossDown`), `runCalculation`/`distribute`/`distributeSingle`/`distributeMultiple`/`emit`, `applyCableEffects` decisions, `getNodeStats` |
+| Adapter boundary | `PacketInputs`, `PacketInjectionHandler`, `PacketTickResult`, `PacketNodeStats` | per-tick source/sink data, inject/draw callbacks, effect decisions |
+
+Decisions encoded here:
+
+* **Loss constants** come from the graph the adapter builds (Phase 2 will use 1.7.10's `0.4`/`0.2`
+  values, configurable later per §10.1).
+* **Gap 4 suppression** is implemented in `PacketGrid.applyEffects` (a path with a conductor overload can
+  never add its sink to `sinksToExplode`).
+* **Multi-packet** distribution is implemented and `PacketInputs.sourcePackets` defaults to 1; the public
+  opt-in API is deferred per §10.5.
+* **Stats** expose `maxPacket` + tier; the Phase-2 adapter maps that to rated volts (or raw tier when the
+  config asks for it) per §10.2.
+
+Tests: 20 new (`PacketMathTest` 5, `PacketGridTest` 15)
+covering tier/power boundaries, effective-packet accounting, min-loss path selection, direct paths,
+loss-adjusted delivery, demand caps, full/partial rejection, melt/shock/suppression, explosion without
+conductor overload, insulation strip, per-path suppression with two sources, multi-packet spreading,
+node stats, `roundLossDown`, the source-to-source composition quirk, and an inactive grid. All 31 project
+tests pass; `./gradlew build` is green.
+
+Deferred to Phase 2: building the graph from a live `Grid`, per-tick inputs from tiles, direction mapping,
+entity shock aggregation/application (max per path per entity, sum across paths), actual
+remove/strip/explode application, config keys, stats overrides, mixins and the conflict plugin. The literal
+1.12.2 source-to-source composition (`loss -= link.getLoss()`, junction conductor omitted) is replicated
+and pinned by a test; see §2.5.
