@@ -676,14 +676,42 @@ budget and must be run as a batch job, not on the fly.
 
 ### 11.5 TODO
 
-* [ ] Write the offline batch scanner (Python `zipfile`), run it over all 233 non-IC2 jars of the primary pack
-      and store the raw output under `COMPAT_RECON/` (git-ignored or a small summary only).
-* [ ] Inspect every hit by hand and fill in `COMPAT_RECON.md` (mod, mechanism, classes, overlap, risk, test).
+* [x] Write the offline batch scanner (`tools/scan_ic2_refs.py`) and run it over the primary pack and both
+      secondary packs; raw JSON in `build/recon/ic2-scan.json`, review artifact in `COMPAT_RECON.md`.
+* [x] Initial triage of the high/modifying hits (EnergyControl, Angelica, Galacticraft, Hodgepodge).
+* [ ] Confirm EnergyControl's storage/cable hook behavior in-game while packet mode is on (its `IC2Hooks`
+      class is the only real `ic2/core/block/wiring` modification in the pack).
 * [ ] Inspect Hodgepodge's reactor/chamber mixins for source-output changes that interact with the packet
       model's throttling.
-* [ ] Re-run on the secondary packs (Modrinth `FuzzCraft`, `Alone_ Modded World`).
-* [ ] Add the `IMixinConfigPlugin` conflict list once the hits are known (Phase 2/3).
-* [ ] Re-check after any packet-model code lands and again at Phase 4 before the default flip.
+* [ ] Add the `IMixinConfigPlugin` conflict list once the runtime behaviour is known (Phase 2/3).
+* [ ] Re-run after any packet-model code lands and again at Phase 4 before the default flip.
+
+### 11.6 Baseline result (2026-10-19 snapshot)
+
+| Pack | Jars | critical | high | medium | api |
+|---|---:|---:|---:|---:|---:|
+| FuzzCraft-Legacy | 233 | 0 | 1 | 26 | 10 |
+| FuzzCraft-Modrinth | 20 | 0 | 0 | 0 | 0 |
+| Alone-Modded-World | 26 | 0 | 0 | 0 | 0 |
+
+The two Modrinth profiles are 1.20 packs and contain no IC2 references. The primary pack's hits were triaged:
+
+* **EnergyControl** (high) — `com.zuxelus.energycontrol.hooks.IC2Hooks` (HookLib transformer) references
+  `ic2/core/block/wiring` storage/MFSU classes. It does not touch the enet; its energy display/upgrade
+  behaviour is a storage canary during validation.
+* **Angelica** (medium after triage) — the `TargetedMod` enum lists `ic2.core.coremod.IC2core` (target /
+  exclusion list) and `MixinRenderLiquidCell` is client-side fluid-cell rendering. No enet or cabling.
+* **Galacticraft** (medium) — `BlockEnclosed`/`CompatibilityManager` reference `TileEntityCable` as plain
+  classes; no transformer hook.
+* **Hodgepodge** (medium) — IC2 armor, crops, reactor/chamber and water-kinetic mixins; no enet or cabling.
+  Its reactor mixins change source offers, making it a delivery canary.
+* **AFSU, advancedmachines, IC2NuclearControl, Waila, OpenPeripheralIntegration, NotEnoughResources, …**
+  (medium) — plain use/extension of IC2 machine and storage internals; delivery-change canaries.
+* **API-only** (10 jars) — no internals; subject to the §7 delivery changes.
+
+**Conclusion:** no mod in this pack statically targets the packet-model seams (`ic2.core.energy.Grid`,
+`EnergyNetLocal.processChanges`, `getNodeStats`). The remaining risk is ASM that matches obfuscated names at
+runtime and future pack updates; re-run the scanner before the Phase 4 default flip.
 
 ---
 
@@ -723,3 +751,66 @@ entity shock aggregation/application (max per path per entity, sum across paths)
 remove/strip/explode application, config keys, stats overrides, mixins and the conflict plugin. The literal
 1.12.2 source-to-source composition (`loss -= link.getLoss()`, junction conductor omitted) is replicated
 and pinned by a test; see §2.5.
+
+---
+
+## 13. Residual gaps after the packet model (and the aggregation question)
+
+### 13.1 Does aggregation still happen?
+
+With `enablePacketModel=true` and the Phase-2 adapter in place, **no fault threshold uses a sum across sources
+or paths**:
+
+* `PacketGrid.emit` records `path.maxPacketConducted = max(effectiveAmount, …)` for each source→sink path.
+* `PacketGrid.applyEffects` evaluates each event path at that path's `maxPacketConducted`; a cable on several
+  paths uses the **max**, not the sum. A junction carrying two 32 EU/t packets does not melt a 33-breakdown
+  cable.
+* Machine explosions collect `sink -> max offending packet` and compare it to the sink tier; multiple paths to
+  one machine do not add up.
+
+So the 2×BatBox→LV false explosion and the junction false melt disappear once packet mode is active. Physical
+energy delivered by several paths still adds in the machine's buffer (that is real energy, not an overload
+trigger), and a cable's actual throughput still sums physically; only the *fault checks* are per packet,
+exactly like 1.12.2.
+
+Aggregation can still appear if:
+
+1. `enablePacketModel=false` (the legacy per-node mode, before Phase 4 or as a deliberate fallback).
+2. A mod bypasses or replaces IC2's `EnergyNet`, so our calculator is not driving it.
+3. The adapter forgets 1.12.2's source-offer cap
+   (`min(getOfferedEnergy(), powerFromTier(tier) × packets)`), letting an over-offering single-packet source
+   push a too-large packet down one path.
+4. The source is multi-packet: each chunk is evaluated independently and `maxPacketConducted` is the largest
+   chunk, not the sum.
+5. Multiple independent grids are merged by mistake; per-grid calculators and per-tile offer sharing keep
+   them separate.
+
+Validation canaries: 2×BatBox→LV (no explosion), MFSU→copper→LV (cable melts, machine survives), a junction
+fed by two 32 EU/t sources (cable does not melt at 64), and a cable that is a member of two paths.
+
+### 13.2 Residual gaps vs 1.12.2
+
+| # | Gap | Impact | Disposition |
+|---|---|---|---|
+| 1 | Absorption policy is 1.7.10-adapted (insulated cables shock only while melting) | Shock only; melt/explosion thresholds are exact | Deliberate (§10, gap 14); revisit if 2x/3x insulation becomes usable |
+| 2 | Loss constants stay 1.7.10 `0.4`/`0.2` initially | Delivered energy on machine-adjacent hops; no fault-check impact | Config planned; eventual 1.12.2 defaults (§10.1) |
+| 3 | `NodeStats.voltage` reports rated volts, not the 1.12.2 tier index | Display/API only; effects read path data | Deliberate (§10.2); config for strict tier |
+| 4 | No `ExplosionIC2.Type.Electrical` in 1.7.10 | Blast visuals/type only | Unavailable; plain blast is the closest match |
+| 5 | No public multi-packet source API yet | Third-party multi-packet sources cannot opt in | Internal support exists; API deferred to Phase 4 (§10.5) |
+| 6 | Config surface differs (separate meltdown/explosion/shock toggles; no IC2.ini keys) | Pack tuning, not simulation | Superset; documented (gap 9) |
+| 7 | Topology/lifecycle timing differs (1.7.10 applies changes synchronously; 1.12.2 queues them) | Possible one-tick routing difference after place/break | Adapter rebuilds on `invalidate`; validate chunk reload/place-break cases |
+| 8 | Literal 1.12.2 source→source composition quirks (subtracted link, omitted junction conductor) | Could under-report loss/effects on that one junction | Replicated and pinned (`PacketGridTest`); revisit if correctness should beat parity |
+| 9 | `getNodeStats`/`getTotalEnergy*` semantics are packet-based and overridden | External meters see delivered energy and rated volts | Matches §10.2; document for mod authors |
+| 10 | `IOverloadHandler`/`IExplosionPowerOverride` are our own interfaces | 1.12.2 mods cannot implement them by binary name | Semantic parity; document the API |
+| 11 | `explodeMachine` achievement is not issued | Minor cosmetic/advancement difference | Add in Phase 2/3 if desired |
+| 12 | Entity shock AABB/sub-tile semantics are adapter-side | Damage can differ at box edges | Replicate 1.12.2 per-sub-tile/bbox logic and validate |
+| 13 | `Tile.isDisabled`/removal timing differs (1.7.10 removes immediately) | Mid-tick removal ordering | Collect effects, apply after distribution, re-check validity |
+| 14 | Performance profile differs (Dijkstra on topology change, per-path tick work) | No functional gap; big bases need measurement | Phase 3 perf test (1k cables / 100 sources) |
+| 15 | Mods bypassing IC2's enet (e.g. custom `IEnergyNet`) are outside the calculator | Out of scope, same as 1.12.2 | Detect and disable/warn (conflict plugin) |
+| 16 | Target is 2.8.222, not later unified calculators | Deliberate | 2.8.222 is the reference for gap 1/4 |
+| 17 | Insulation stripping is a no-op | None | Parity: 1.12.2 also has 9001/no-op |
+
+**Bottom line:** after Phase 4 the only *rule* deviation that can still bite is the deliberate shock-absorption
+policy (item 1); loss constants, `NodeStats` voltage and the multi-packet API are config/API decisions, and the
+remaining rows are lifecycle/visual/edge-case differences. The aggregation false positives that motivated gap 1
+are gone when packet mode is active.
