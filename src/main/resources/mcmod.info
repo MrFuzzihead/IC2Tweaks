@@ -1,0 +1,23 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Core tweaks for IndustrialCraft 2: a global IC2 Experimental 1.12.2 style voltage/packet overload system (off by default).",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/MrFuzzihead/IC2Tweaks",
+		"updateUrl": "https://github.com/MrFuzzihead/IC2Tweaks/releases/latest",
+		"authorList": [
+		  "MrFuzzihead"
+		],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": ["required-after:IC2"],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}
