@@ -501,11 +501,173 @@ This is a *global delivery rewrite*, so the blast radius is every IC2 energy par
 
 ---
 
-## 10. Open decisions
+## 10. Open decisions (detailed)
 
-1. Loss constants: keep 1.7.10 (`0.4`/`0.2`) or port 1.12.2 (`0.002`/`0.001` + `roundEnetLoss`)?
-2. `NodeStats.voltage`: tier (faithful) vs volts (compat shim)?
-3. Gap 4 suppression: match 2.8.222 (suppress) — recommended — or modern IC2 (no suppression)?
-4. When does `enablePacketModel` flip to `true` by default, and do we keep a legacy fallback release?
-5. Do we expose an `IMultiEnergySource`-like interface of our own for multi-packet 1.7.10 sources
-   (gap 16), or leave it closed?
+### 10.1 Loss constants — keep 1.7.10 (`0.4`/`0.2`) or port 1.12.2 (`0.002`/`0.001`)?
+
+**Facts.** A link's loss is the mean of its endpoints' `getInnerLoss()`:
+
+| Link | 1.7.10 | 1.12.2 (2.8.222) |
+|---|---|---|
+| machine ↔ machine | `(0.4+0.4)/2 = 0.4` | `(0.002+0.002)/2 = 0.002` |
+| machine ↔ cable | `(0.4+0.2)/2 = 0.3` (copper) | `(0.002+0.2)/2 = 0.101` |
+| cable ↔ cable | `(0.2+0.2)/2 = 0.2` | `0.2` (identical) |
+
+Cable conduction loss is the *same constant in both versions* — only links touching a machine differ. 1.7.10
+defines `nonConductorResistance = 0.2` but never reads it in the enet; 1.12.2 derives its 0.002 inner loss
+from `EnergyNetSettings.nonConductorResistance = 0.001`. Practical effect: long runs are dominated by cable
+loss and barely change (MFSU + 10 copper hops: 2.4 vs 2.002); short/direct paths change a lot
+(BatBox→BatBox: 0.4 EU/t ≈ 1.25 %, ~495 EU per full transfer, vs 0.002 ≈ 0.006 %, ~2.5 EU).
+
+* **Option A — keep 1.7.10 constants.** Isolates the refactor: only *allocation* semantics change, so any
+  in-game difference is attributable to the packet model, not to balance. Preserves the loss behavior users
+  of the current forcing mode already see, and keeps the documented 495 EU example true. Downstream: nothing
+  new beyond the packet model itself.
+* **Option B — port 1.12.2 constants.** Machine hops become effectively free, matching 1.12.2's economy and
+  making direct connections lossless-feeling. Cost: a second delivery change stacked on the first, the old
+  numbers become wrong, and the change must be scoped to the packet-model path loss only — `Node.getInnerLoss()`
+  is also read by the legacy linear solver, so a blanket mixin would silently change legacy mode too.
+* **Recommendation: keep 1.7.10 constants for Phases 1–3.** If validation says machine-adjacent loss feels
+  wrong versus 1.12.2, add `packetModelMachineLoss` (0.4 default, 0.002 optional) applied **only when building
+  packet paths**, leaving legacy mode untouched. A/B it in-game before deciding; do not couple the choice to
+  the packet-model landing.
+
+### 10.2 `NodeStats.voltage` — 1.12.2 tier vs 1.7.10 volts
+
+**Facts.** 1.12.2 returns `getTierFromPower(maxPacketConducted)` — a tier *index* (1, 2, 3…), not volts.
+Consumers we found:
+
+* IC2 1.7.10 itself: `ic2.core.item.tool.ContainerMeter` (the EU meter GUI) calls `NodeStats.getVoltage()`
+  and renders it next to `EnergyIn`/`EnergyOut`; `TileEntityCableDetector` and the `BlockCable` comparator
+  use `getEnergyIn()` only (unaffected by the voltage choice).
+* IC2 1.12.2's own `ContainerMeter` reads the same `getVoltage()`, so the tier convention is what the 1.12.2
+  UI was built against.
+* External: WAILA plugins, energy-meter addons, OpenComputers/pack-script integrations.
+
+* **Option A — exact tier.** Full parity, zero mapping logic. But in 1.7.10 the field is labelled voltage and
+  the stock EU meter would show `3` for an MFSU — a user-visible regression in IC2's own UI, and every
+  1.7.10-era addon that reads it was written for volts.
+* **Option B — rated volts** (`getPowerFromTier(getTierFromPower(max))` → 32/128/512…). Preserves 1.7.10 UI
+  meaning; the packet model's *logic* does not consume `NodeStats` at all (effects read path data), so this is
+  purely a display/compat surface. Diverges from 1.12.2 by exactly this one field.
+* **Option C — config switch** (`packetModelTierVoltage`, default one of the above). Cheap, but two semantics
+  in the wild makes support and docs worse.
+* **Recommendation: rated volts by default, with a config to opt into raw tier.** Revised from the earlier
+  "exact tier" lean: `getEnergyIn/Out` becoming packet-based is a strict improvement, but showing tier
+  indexes in 1.7.10's voltage field breaks stock UI and addons for no functional gain. Document the one-field
+  deviation; expose `packetModelTierVoltage=true` for strict parity.
+
+### 10.3 Gap 4 — `conductorOverload` suppression
+
+2.8.222 skips the sink explosion when a conductor on the same path overloads; post-1.12.2 calculators removed
+that. With the packet model the check is a field on the path (cheap); with the legacy per-node pass it was
+gap 4 (hard).
+
+* **Suppression on** = the cable acts as a fuse: MFSU → copper → LV machine melts the copper and the machine
+  survives. Per-path, so a machine fed by two paths can still explode through the path whose cable held.
+* **Suppression off** (today's legacy behavior) = both melt and explode; the machine can die even though its
+  feed already melted, which reads as a double punishment/random.
+* **Recommendation: match 2.8.222 and suppress.** It is the stated target, it is nearly free in the packet
+  model, and it makes cable choice meaningful as protection. Note the divergence from modern IC2 in the docs;
+  no config (keep the surface small). Validate the visual clarity of "cable melts, machine lives" in-game.
+
+### 10.4 `enablePacketModel` default and rollout
+
+Forge only applies a config default when the key is absent, so a later default flip silently changes behavior
+for every existing install — the rollout is a planned event, not a code detail.
+
+* Off through Phases 1–3: the branch/PR lands without changing anyone's active behavior; both code paths stay
+  live and testable; the packet model gets validated on real saves before it is authoritative.
+* Flip to `true` at Phase 4 when the §9 checklist is green (packet model proves itself against the legacy
+  mode in the same world). Keep the key as a documented fallback for at least one release; retire
+  `EnetCableEffects`/`EnetConductorRegistry`/`MixinEnergyNetLocalOverload` after that (or keep them behind the
+  key for one more cycle if pack authors need it).
+* Release notes must call out the delivery changes (multi-injection, demand caps, source throttling) and the
+  `NodeStats` deviation from §10.2; `/ic2tweaks status` should print the active model.
+* When packet mode is on, stop forcing `useLinearTransferModel` (gap 10); when off, keep today's behavior
+  exactly.
+* **Recommendation: off now, on at Phase 4, key retained for one release.**
+
+### 10.5 Gap 16 — our own multi-packet source interface?
+
+1.7.10 has no `IMultiEnergySource`, and every 1.7.10 source is one packet per tick by API contract. Without
+it, an over-offering source is throttled to `powerFromTier(tier)` per tick (pitfall 6), which is 1.12.2's
+behavior for single-packet sources.
+
+* **Leave closed**: simplest, no new API promise; the port still reads a `packetCount` internally, fixed at 1.
+* **Expose our own opt-in interface** (e.g. `com.mrfuzzihead.ic2tweaks.api.IMultiPacketSource` with
+  `sendMultiplePackets()` / `getPacketAmount()`): a few lines to wire `distributeMultiple`; lets future ports
+  of 1.12.2 machines source several packets per tick; opt-in only, so no existing mod changes behavior.
+  Downsides: a new public API to support, and pack authors could use it to exceed tier limits by design.
+* **Recommendation: implement the internal `packetCount`/`distributeMultiple` support during the port (keeps
+  the port faithful to 1.12.2), but do not publish the interface until Phase 4.** Decide then whether any mod
+  wants it; if not, it stays closed with the internal hook dormant.
+
+---
+
+## 11. Compatibility reconnaissance (TODO — before any packet-model code is pushed)
+
+Our hooks overlap the few IC2 internals another mod is most likely to touch: `EnergyNetLocal.processChanges`,
+`Grid.invalidate`/`startCalculation`, `EnergyNetLocal.getNodeStats`/`getTotalEnergyEmitted|Sunken`,
+`TileEntityCable`, and package injection into `ic2.core.energy`. Static reconnaissance of the production pack
+is therefore a release gate.
+
+### 11.1 Sources
+
+* Primary: `C:\Users\Duncan\AppData\Roaming\PrismLauncher\instances\FuzzCraft-Legacy\minecraft\mods`
+  (234 jars, `industrialcraft-2-2.2.828-experimental.jar`, `hodgepodge-2.7.216.jar`).
+* Secondary: `...\ModrinthApp\profiles\FuzzCraft\mods`, `...\ModrinthApp\profiles\Alone_ Modded World\mods`.
+* Re-run after every pack update; new mods (and new versions of Hodgepodge-style bugfix mods) can add mixins at
+  any time.
+
+### 11.2 Method (repeatable)
+
+1. Enumerate jars; skip IC2 itself.
+2. For each jar, extract all entries to a temp dir and grep **every** file (classes, JSON, cfg) for
+   `ic2[/.]core[/.](energy|block/wiring|coremod)`. Constant pools expose mixin target class refs, ASM string
+   constants and AT targets, so this catches mixins, coremods and ATs alike.
+3. Separately list jars that *ship classes* under `ic2/core/` — package injectors, the same trick this mod may
+   use for `ic2.core.energy`.
+4. Read `*mixins*.json` and `*_at.cfg` for any `ic2` reference (belt and braces; some tools keep targets in
+   JSON rather than bytecode).
+5. Controls: step 2 must hit on the IC2 jar (positive) and miss on a known-unrelated jar (negative).
+6. Record every hit in a `COMPAT_RECON.md` matrix: mod, mechanism (mixin/coremod/AT/package injection/API),
+   IC2 classes touched, overlap with our hooks, risk, mitigation, test status.
+
+Notes from the first run: naive `unzip` wildcards do not recurse (`*` does not cross `/`), so use extract-all or
+an offline Python `zipfile` scan (`namelist()` + `read()`) — full extraction of all 233 jars exceeded a 15-minute
+budget and must be run as a batch job, not on the fly.
+
+### 11.3 First-pass findings (IC2-named and known-IC2 jars only)
+
+* **Hodgepodge 2.7.216** — mixes into IC2 armor (hazmat/jetpack/nano/quantum/solar helmet/static boots),
+  night-vision, water kinetic generator, crops, the nuclear reactor and its chambers, tin cans, cells, and IC2
+  localization/resource loading. **No references to `ic2/core/energy` or `ic2/core/block/wiring`** — no hook
+  overlap with us. Its reactor/source mixins change *how much* energy is offered, which the packet model
+  handles like any other source (throttling per §10.5 / pitfall 6).
+* **IC2NuclearControl 2.7.17**, **Ic2ExpReactorPlanner** — IC2 API only, no internal references.
+* **IC2 addons in the pack** (`AdvancedSolarPanel`, `GraviSuite`/`gravisuiteneo`, `advancedmachines`,
+  `CompactSolars`, `EnergyControl`, `SolarFlux`) — API consumers, i.e. subject to the delivery-change matrix in
+  §7, not to mixin conflicts. `advancedmachines` and the solar mods are the best in-game canaries (sinks that
+  charge slowly, sources that offer at their tier).
+
+### 11.4 Risk taxonomy and mitigation
+
+| Risk | Signal | Mitigation |
+|---|---|---|
+| Mixin/ASM collides with our exact hooks | refs to `ic2/core/energy/…` or `processChanges` in bytecode/JSON | `IMixinConfigPlugin` conflict list, `setApplyIf` gating, log-and-disable, document |
+| Package injection into `ic2/core/*` | classes shipped under `ic2/core/` | detect at scan time; same-package split is additive unless names collide |
+| AT widening IC2 internals | `*_at.cfg` referencing `ic2` | scan; ATs from other mods do not conflict with ours |
+| Enet replacement (`EnergyNet.instance = …`) | class refs to `ic2/api/energy/EnergyNet` + custom `IEnergyNet` impl | detect at runtime (`EnergyNet.instance` type), disable packet mode with a warning |
+| API consumers (sinks/sources/conductors/stats) | `ic2/api/energy` refs | §7 matrix; in-game canaries; release notes |
+
+### 11.5 TODO
+
+* [ ] Write the offline batch scanner (Python `zipfile`), run it over all 233 non-IC2 jars of the primary pack
+      and store the raw output under `COMPAT_RECON/` (git-ignored or a small summary only).
+* [ ] Inspect every hit by hand and fill in `COMPAT_RECON.md` (mod, mechanism, classes, overlap, risk, test).
+* [ ] Inspect Hodgepodge's reactor/chamber mixins for source-output changes that interact with the packet
+      model's throttling.
+* [ ] Re-run on the secondary packs (Modrinth `FuzzCraft`, `Alone_ Modded World`).
+* [ ] Add the `IMixinConfigPlugin` conflict list once the hits are known (Phase 2/3).
+* [ ] Re-check after any packet-model code lands and again at Phase 4 before the default flip.
