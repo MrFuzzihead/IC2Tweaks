@@ -347,6 +347,9 @@ In-game (dev client + dedicated server):
 Summary of what is missing, whether it can be closed, and how hard it would be. "Mixin" here means
 adding/modifying a mixin in this mod; "plain" means ordinary mod code.
 
+(Statuses in this table are from the first implementation round. §12 recalculates them after the
+round-1 fixes, reclassifies gaps 2 and 4, and adds the absorption policy as gap 14.)
+
 | # | Gap | Closable? | Approach | Difficulty | Risk |
 |---|-----|-----------|----------|------------|------|
 | 1 | Per-packet vs per-node aggregate | No (practically) | Rewrite the distribution model (port `EnergyCalculatorLeg`) | Infeasible / very high | Extreme |
@@ -630,3 +633,83 @@ verbatim so the tooltip matches the simulation. The existing `N EU/t` line is re
   this document were corrected to match.
 - **Tests.** `EnetOverloadMathTest` covers `shockEnergy`/`shockDamageFromEnergy`; `EnetCableDataTest`
   pins the cable loss table (including the insulated-tin quirk).
+
+---
+
+## 12. Parity recalculation (after the first validation round)
+
+Recalculated after the round-1 fixes: gap 6 closed (per-entity shock accumulation) and meltdown/shock
+moved into the same pass. Two earlier assessments are corrected here:
+
+- **Gap 2 (insulation stripping) is not a gap.** 1.12.2's `getInsulationBreakdownEnergy()` is also
+  `9001`, and every conductor breakdown is at most `8193`, so `cablesToStrip` can never populate there
+  either. Doing nothing is parity.
+- **Gap 4 (`conductorOverload` suppression)** was later removed upstream: the modern
+  `EnergyCalculatorUnified` has no suppression at all, so letting both effects fire is defensible.
+
+### 12.1 Scorecard
+
+| Dimension | Parity | Notes |
+|---|---|---|
+| Effect rules (what melts / explodes / shocks) | ~90% | The remaining rule gap is the absorption table (gap 14). |
+| Effect math (thresholds, damage, blast) | ~95% | `ceil(energy / 64)`, `capacity + 1` breakdown, tier power, 2.5 / 0.75 blast all match. |
+| Tick coherence | ~85% | Both effects fire in the same pass now; the cable pass is still a separate world-tick pass from the machine pass. |
+| Per-packet fidelity (junctions, multi-source, multi-packet) | ~50% | Gap 1 knocks on to melt/shock/explosion values and false positives. |
+| Interop / config surface | ~70% | No graceful hooks; config lives in `ic2tweaks.cfg`; otherwise clean. |
+
+### 12.2 Revised gap matrix
+
+| # | 1.12.2 behaviour | Ours | Status | Effort |
+|---|------------------|------|--------|--------|
+| 1 | Per-source `EnergyPath`, `maxPacketConducted` per packet | per-node `max(currentIn, currentOut) · V` | Missing (structural) | Very high |
+| 3 | `IOverloadHandler.onOverload(tier)`, `IExplosionPowerOverride` | absent | Missing | Easy |
+| 4 | suppress sink explosion when a cable on the path overloaded | both effects fire | Missing | Hard, low value |
+| 5 | `amount = min(offer − loss, sinkDemand)` | all-or-nothing `injectEnergy`, no cap | Missing | Easy code / high balance risk |
+| 6 | max per conductor per path, sum across paths, one `ceil(/64)` | max across conductors, one `ceil(/64)` | Approximated (closed) | Medium for exact path sums |
+| 7 | `ExplosionIC2.Type.Electrical` | `IC2.explodeMachineAt`, no type | Partial | Easy-medium |
+| 9 | keys in `IC2.ini`; `enetCableMeltdown=false` also disables explosions/shocks | `ic2tweaks.cfg`; separate toggles (superset) | Cosmetic | Easy |
+| 11 | `NodeStats` from path data, same tick | `lastNodeStats` = `current · V`, one-tick stale | Missing | Medium |
+| 12 | effects run inside the calculator, one pass per grid tick | machines in `processChanges`, cables at `WorldTickEvent.END` | Partial | Medium |
+| 13 | no tier-resistance starvation | high-tier machines starve | Inherent IC2 quirk | Medium (mitigation) |
+| 14 | absorption = `tierPower(insulation + (tin ? 0 : 1))`; non-insulatable types immune | 1.7.10 legacy table (Cu 5, Au 6, HV 3, Sn 8; insulated 9001) | Missing (deferred) | Easy |
+| 15 | sink explosion on `amount` (post demand cap) | on `accepted` (`amount − returned`) | Equivalent for all-or-nothing sinks | Low |
+| 16 | multi-packet sources (`IMultiEnergySource`) | 1.7.10 has no such API | Missing (part of 1) | Structural |
+
+Gaps 2, 8 and 10 are closed or inherent as noted above.
+
+### 12.3 If we want full effect parity
+
+1. **Absorption table (gap 14)** — the one remaining visible rule gap. Map the 1.7.10 metas to insulation
+   levels and use `getPowerFromTier(insulation + (tin ? 0 : 1))`, with glass/detector/splitter immune.
+   This also closes finding 1 by construction (bare tin becomes the deadliest cable).
+2. **Graceful hooks (gap 3)** — own `IOverloadHandler` / `IExplosionPowerOverride`, checked in 1.12.2
+   order (`config → onOverload(getTierFromPower(amount)) → shouldExplode / getExplosionPower → explode`).
+3. **Cable pass into the enet tick (gap 12)** — run it from the `processChanges` `RETURN` hook (fresh
+   `NodeStats`, `locked == false`), removing the tick-ordering mismatch with machine explosions. Needs a
+   world reference (take it from a registered conductor or shadow an enet field).
+4. **Direct node read for cable stats (gap 11)** — removes the stale-tick window.
+5. Optional, opt-in only: demand cap (gap 5), direct `ExplosionIC2` construction (gap 7), IC2.ini key
+   mirroring (gap 9).
+
+Items 1–4 put rule/math parity at roughly 97%, with the remaining divergences localised to the
+distribution model.
+
+### 12.4 If we want numerical parity
+
+The only route to per-packet values is porting `EnergyCalculatorLeg` / `EnergyCalculatorUnified`: path
+discovery, per-source distribution, `maxPacketConducted`, demand caps, rejection handling and
+multi-packet sources — replacing `Grid.calculateDistribution` / `calculateEffects`. That one rewrite
+closes gaps 1, 4, 5, 6 (exactly), 7 (partial), 11, 12, 15 and 16 at once.
+
+Cost/risk:
+
+- it changes energy *delivery* for every machine and addon (loss, demand caps, rejection
+  redistribution), not just the overload effects;
+- it must coexist with GTNH's IC2 patches and other enet mixins (StellarCore-style optimizers);
+- the async calculation, `locked` rules and performance on large grids all need redoing.
+
+Recommendation: do not do this unless replacing the energy net becomes the mod's goal. The middle path —
+keeping 1.7.10 delivery but running one solve per source (others zeroed) to attribute link currents to
+sources and synthesise path data *for effects only* — makes effects per-source accurate without touching
+delivery, but costs O(sources) extra solves per grid per tick and still cannot model true packet caps.
+It is clever but probably not worth it vs. the effect-parity work in §12.3.
