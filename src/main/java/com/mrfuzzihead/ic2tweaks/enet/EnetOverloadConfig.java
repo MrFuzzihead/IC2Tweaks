@@ -31,8 +31,8 @@ public final class EnetOverloadConfig {
      */
     public static boolean packetModel = true;
 
-    /** Mirrors 1.12.2's {@code misc/roundEnetLoss}: floor each path's accumulated loss. */
-    public static boolean packetModelRoundLossDown = false;
+    /** Mirrors 1.12.2's {@code misc/roundEnetLoss} (default true): floor each path's accumulated loss. */
+    public static boolean packetModelRoundLossDown = true;
 
     /**
      * When on, {@code NodeStats.getVoltage()} reports 1.12.2's raw tier index instead of the rated tier
@@ -83,9 +83,9 @@ public final class EnetOverloadConfig {
         packetModelRoundLossDown = configuration.getBoolean(
             "packetModelRoundLossDown",
             CATEGORY,
-            false,
-            "Packet model only: floor each energy path's accumulated loss, mirroring IC2 1.12.2's "
-                + "misc/roundEnetLoss option.");
+            true,
+            "Packet model only: floor each energy path's accumulated loss. Default true, matching IC2 "
+                + "1.12.2's misc/roundEnetLoss; set false to keep the fractional 1.7.10 path losses.");
 
         packetModelTierVoltage = configuration.getBoolean(
             "packetModelTierVoltage",

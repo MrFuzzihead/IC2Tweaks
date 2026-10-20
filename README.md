@@ -39,7 +39,7 @@ that changes to IC2 itself can be shipped and versioned independently.
 | ------ | ------- | ----------- |
 | `enableEnetOverload` | `true` | Master switch. Legacy mode forces IC2's `misc/useLinearTransferModel` to `true`; packet mode replaces the distribution with the 1.12.2 packet calculator instead |
 | `enablePacketModel` | `true` | 1.12.2 packet/path calculator (default). Melt/shock/explosion checks use each path's own packet (no aggregation), the legacy per-node passes are disabled, and the `useLinearTransferModel` override is skipped. Set `false` for the one-release legacy fallback. Requires a restart |
-| `packetModelRoundLossDown` | `false` | Packet model only: floor each path's accumulated loss, mirroring IC2 1.12.2's `misc/roundEnetLoss` |
+| `packetModelRoundLossDown` | `true` | Packet model only: floor each path's accumulated loss, matching IC2 1.12.2's default `misc/roundEnetLoss=true`; set `false` for fractional 1.7.10 losses |
 | `packetModelTierVoltage` | `false` | Packet model only: report 1.12.2's raw tier index from `NodeStats.getVoltage()` instead of the rated tier voltage |
 | `enableEnetExplosions` | `true` | Machines explode when they accept a packet above their tier's voltage |
 | `enableEnetCableMeltdown` | `true` | Cables melt when their carried energy exceeds the conductor breakdown energy |
@@ -62,9 +62,9 @@ A nearly full sink also receives only its remaining demand (demand cap), so the 
 while a small amount flows.
 
 `NodeStats` energy in/out **sums** the packets, while `voltage` is the rated tier of the **largest packet**,
-rounded up: 33–128 EU/t → 128 V, 129–512 → 512 V. Two 32 EU/t packets read as 62 EU/t total at 32 V, not
-64 EU/t at 128 V. A demand-capped 49 EU/t packet from an MFSU reads 128 V even though the MFSU's own tier
-is 2048.
+rounded up: 33–128 EU/t → 128 V, 129–512 → 512 V. Two 32 EU/t packets read as 64 EU/t total at 32 V with
+the default `roundLossDown=true` (62 EU/t if you set it false), not as one 64 EU/t packet at 128 V. A
+demand-capped 49 EU/t packet from an MFSU reads 128 V even though the MFSU's own tier is 2048.
 
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):

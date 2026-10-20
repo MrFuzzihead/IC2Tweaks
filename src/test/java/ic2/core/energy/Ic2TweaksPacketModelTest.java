@@ -17,6 +17,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketGraph;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketInjectionHandler;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketInputs;
@@ -42,6 +43,9 @@ class Ic2TweaksPacketModelTest {
         // EnergyNetLocal's static initializer reads MainConfig; unit tests have no IC2 preInit.
         Config config = new Config("ic2tweaks-test");
         config.set("misc/useLinearTransferModel", Boolean.FALSE);
+        // Keep exact 1.7.10 loss assertions in this graph-mapping test even though the shipped default
+        // floors path losses (1.12.2 roundEnetLoss=true).
+        EnetOverloadConfig.packetModelRoundLossDown = false;
         Field field = MainConfig.class.getDeclaredField("config");
         field.setAccessible(true);
         field.set(null, config);

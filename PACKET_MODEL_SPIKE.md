@@ -200,7 +200,7 @@ most compatibility-sensitive part. Revisit only if Option B proves structurally 
 | Key (`energynet` category) | Default | Meaning |
 |---|---|---|
 | `enablePacketModel` | `false` during the spike, `true` at release | master switch for the packet calculator; off = today's behavior |
-| `packetModelRoundLossDown` | `false` | mirrors `misc/roundEnetLoss` |
+| `packetModelRoundLossDown` | `true` | mirrors `misc/roundEnetLoss` (1.12.2 default true) |
 | existing `enableEnetExplosions`/`Meltdown`/`Shocks` | unchanged | still gate effects |
 
 ### 4.2 Class placement (the package-access problem)
@@ -307,7 +307,7 @@ no persisted state, no client state.
 | `ExplosionIC2(..., Type.Electrical)` | `ExplosionIC2(world, null, x+.5, y+.5, z+.5, power, 0.75f)` | no electrical type in 1.7.10 |
 | `world.getEntitiesWithinAABB` equivalents (1.12.2 `func_72872_a`) | `world.getEntitiesWithinAABB` | shock box from path bounding box, expanded by 1 |
 | `MainConfig misc/enetCableMeltdown`, `enableEnetExplosions` | our config toggles | keep ours |
-| `misc/roundEnetLoss` | new `packetModelRoundLossDown` | default false |
+| `misc/roundEnetLoss` | new `packetModelRoundLossDown` | default true (matches 1.12.2) |
 | `world.rand`, `world time` (shuffle every 4th tick) | same, server thread | deterministic per world seed/time |
 
 Decisions to make before Phase 2:
@@ -771,7 +771,7 @@ Delivered on this branch; Phase 4 flips the default to **on** (`enablePacketMode
 * **`MixinEnergyNetLocalPacketModel`** — replaces `processChanges` with the packet tick (the only
   `locked == false` window), clears the now-unused legacy `changes`/`removedTiles`, and overrides the three
   stat methods.
-* **Config** — `enablePacketModel`, `packetModelRoundLossDown`, `packetModelTierVoltage`; legacy mixins are
+* **Config** — `enablePacketModel` (true), `packetModelRoundLossDown` (true), `packetModelTierVoltage` (false); legacy mixins are
   gated off in packet mode, `EnetCableEffects`/`EnetOverload` keep a runtime guard, and
   `EnetOverload.explodePacketTile` implements 1.12.2's per-sub-tile explosion/handler order.
 * **Tests** — seven new (source-offer cap, `NodeStats` voltage mapping, cross-grid offer ledger, two-source
@@ -811,9 +811,9 @@ Result (2026-10-19): **ALL PASS**.
 |---|---|
 | MFSU → LV sink directly | sink exploded (`air`) |
 | MFSU → copper cable → LV sink | copper cable melted; sink **survived** (2.8.222 suppression) |
-| 2×BatBox → one LV sink | no explosion; stats `in=63.2`, `voltage=32.0` |
-| 2×BatBox → one tin cable (breakdown 33) → LV sink | no melt; cable stats `in/out=62.8`, `voltage=32.0` |
-| Source storage block stats | `out=31.6`, `voltage=32.0` |
+| 2×BatBox → one LV sink | no explosion; stats `in=64.0`, `voltage=32.0` |
+| 2×BatBox → one tin cable (breakdown 33) → LV sink | no melt; cable stats `in/out=64.0`, `voltage=32.0` |
+| Source storage block stats | `out=32.0`, `voltage=32.0` |
 | MFE → MV transformer → two independent CESU output grids | both charged (`A≈4.8k`, `B≈5.2k` EU); grid order shuffled |
 | Cow at the overloaded tin cable | shock damage accumulated; health 0 |
 
@@ -825,17 +825,19 @@ Production-pack corroboration (2026-10-19, packet mode):
 * **MFSU → thermal centrifuge, steady 49 EU/t**: the source packet is demand-capped to ~49 EU/t, so
   `getTierFromPower(49) = 2` and the meter reports **128 V**, not the MFSU's 2048 V. A 2048 packet only
   appears when the sink actually demands one (e.g. an empty large buffer).
-* **2×BatBox → 7-overclocker macerator (~62 EU/t)**: each source path carries a 32 EU/t packet (31 EU/t
-  after loss), so the cable entering the macerator reports `energyIn=62` but `voltage=32` — the **max
-  packet**, not the 62 sum. The tin cable (breakdown 33) survives. A single 62 EU/t packet would be tier 2
-  (128 V) and melt it.
+* **2×BatBox → 7-overclocker macerator (~62 EU/t)**: with `roundLossDown=false` each source path carries
+  a 32 EU/t packet (31 EU/t after loss), so the cable entering the macerator reports `energyIn=62` but
+  `voltage=32` — the **max packet**, not the 62 sum. With the shipped default `roundLossDown=true` the
+  short-path losses floor to zero and the same setup reads `energyIn=64`. Either way the tin cable
+  (breakdown 33) survives; a single 64 EU/t packet would be tier 2 (128 V) and melt it.
 * **MFE → MV transformer → two furnaces**: the MFE input packet is only 4.6/8.8 EU/t (the transformer buffers
   and tops up), so its voltage reads 0/32 (tier 0/1); the transformer's output faces emit 128 V (tier 2)
   packets, and the two output grids are shared/shuffled. The voltage follows the **packet at the block you
   measure**, not the source's rated tier.
 
 These two readings are exactly the per-packet behavior gap 1 was about: totals sum, fault/voltage decisions
-use the largest packet.
+use the largest packet. The canary table above uses the shipped `roundLossDown=true`; with `false`, the
+same totals are 63.2 / 62.8 / 31.6 instead of 64.0 / 64.0 / 32.0.
 
 Still manual because they need specific mod/pack setups: transformer packet conversion, a machine with many
 transformer upgrades (tier-starvation fix), and Hodgepodge's reactor source changes (deferred). EnergyControl
