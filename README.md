@@ -52,6 +52,11 @@ enables IC2's experimental lossy model; the opt-in **packet** model (`enablePack
 required) replaces the per-node distribution with the 1.12.2 path/packet calculator, so fault checks use
 each path's packet instead of sums across sources (the gap-1 fix) and the linear model is left alone.
 
+**The packet model is off by default.** Until you set `enablePacketModel=true` and restart, the legacy
+model is what you see: solved voltages (roughly 80% of the tier), and machines with many transformer
+upgrades still starve. With packet mode active, `NodeStats.getVoltage()` reports rated tier volts
+(32/128/512/2048) by default — set `packetModelTierVoltage=true` for tier indices (1/2/3/4).
+
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 
@@ -60,7 +65,7 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   loss), and a source that drops below its output packet size (32 EU/t for a BatBox) stops emitting,
   stranding the remainder.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
-  upgrades (roughly 6+ on an MFSU) draw almost no power. This is legacy-only; the packet model does not
+  upgrades (roughly 6+ on an MFE) draw almost no power. This is legacy-only; the packet model does not
   derive sink resistance from tier.
 - The packet model is experimental: `NodeStats` values are packet-based, and `getVoltage()` reports rated
   volts unless `packetModelTierVoltage=true`; the mixins must be selected at startup (config change

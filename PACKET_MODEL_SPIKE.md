@@ -346,8 +346,8 @@ Decisions to make before Phase 2:
    1.12.2 shuffles its grid list (`shuffleGrids`) exactly for this reason — port that too.
 6. **Source offer cap.** 1.12.2 caps a source's offer at `powerFromTier(tier)` per packet. A 1.7.10
    source offering more than its tier's power is throttled; that is correct for 1.12.2 but is a
-   delivery change (check IC2's own generators and storage blocks first; an MFSU at tier 3 offers 512,
-   aligned).
+   delivery change (check IC2's own generators and storage blocks first; an MFE at tier 3 offers 512 and
+   an MFSU at tier 4 offers 2048, aligned).
 7. **Cache staleness.** One missed invalidation routes energy through a stale path. `Grid.invalidate`
    is the only mutation entry point (`add`/`remove`/`merge` all call it) — verify with a debug
    validator that compares a cached path's links against the live graph and a "rebuild every tick"
@@ -445,7 +445,7 @@ This is a *global delivery rewrite*, so the blast radius is every IC2 energy par
   own tier); chargepads/teleporters exercise repeated injection. These are the best in-game canaries.
 * Transformer upgrades keep making `getSinkTier()` higher; with the packet model that no longer
   starves the machine (gap 13 fixed) — a behavior *improvement* users will notice immediately
-  (previously, ≥6 upgrades on an MFSU made a machine draw almost nothing).
+  (previously, ≥6 upgrades on an MFE made a machine draw almost nothing).
 
 ---
 
@@ -556,9 +556,12 @@ Consumers we found:
 * IC2 1.12.2's own `ContainerMeter` reads the same `getVoltage()`, so the tier convention is what the 1.12.2
   UI was built against.
 * External: WAILA plugins, energy-meter addons, OpenComputers/pack-script integrations.
+* Observed on the production pack in **legacy** mode: BatBox/CESU/MFE/MFSU read 25.7 / 102.5 / 409.8 / 1.6 kV
+  (solved voltages, roughly 80% of tier). With packet mode active the same setups report 32 / 128 / 512 / 2048 V
+  by default, or 1 / 2 / 3 / 4 with `packetModelTierVoltage=true`.
 
 * **Option A — exact tier.** Full parity, zero mapping logic. But in 1.7.10 the field is labelled voltage and
-  the stock EU meter would show `3` for an MFSU — a user-visible regression in IC2's own UI, and every
+  the stock EU meter would show `4` for an MFSU — a user-visible regression in IC2's own UI, and every
   1.7.10-era addon that reads it was written for volts.
 * **Option B — rated volts** (`getPowerFromTier(getTierFromPower(max))` → 32/128/512…). Preserves 1.7.10 UI
   meaning; the packet model's *logic* does not consume `NodeStats` at all (effects read path data), so this is
@@ -813,19 +816,22 @@ changes.
 ### 12.4 Phase 4 gate (manual, before the default flip)
 
 The calculation layer is covered by the 38 tests plus the §12.3 canaries. Before changing the default, run
-this short pack-level pass with `enablePacketModel=true` and compare against `false` where noted:
+this short pack-level pass with `enablePacketModel=true` and compare against `false` where noted. First
+confirm the model is actually active (startup log `Energy-net model: packet`, or `/ic2tweaks status`); in
+legacy mode the voltages are solved values (roughly 80% of tier) and many-upgrade machines still starve,
+which is expected, not a packet-model result.
 
-* [ ] **Transformer**: MFSU → HV transformer → MV machine; correct throughput and no false explosion; also
-      test step-up mode if the pack uses it.
+* [ ] **Transformer**: MFE → HV transformer → MV machine (or MFSU → EV transformer → HV); correct throughput
+      and no false explosion; also test step-up mode if the pack uses it.
 * [ ] **Upgraded machine**: 5–6 transformer upgrades fed by an MFSU; it charges and runs (the gap-13 fix).
-* [ ] **Hodgepodge reactor (highest risk)**: compare reactor EU/t with packet mode on/off. Hodgepodge's reactor
-      mixins can make a source offer more than one tier packet; 1.12.2's single-packet cap would throttle it.
-      If output drops, decide whether to exempt/represent multi-packet sources before flipping the default.
-* [ ] **EnergyControl**: storage/cable display and upgrade-kit behavior still work; it is the pack's only
-      wiring-internal modifier.
+* [ ] **Hodgepodge reactor (deferred)**: compare reactor EU/t with packet mode on/off when it is practical.
+      Hodgepodge's reactor mixins can make a source offer more than one tier packet; 1.12.2's single-packet
+      cap would throttle it. Decide whether to exempt/represent multi-packet sources before flipping the
+      default. EnergyControl is a dead mod and is out of scope.
 * [ ] **EU meter / `NodeStats`**: rated volts (32/128/512), plausible energy in/out.
 * [ ] **Save/reload and chunk unload/reload**: no stale paths, dupes or crashes.
-* [ ] **Two networks on one storage block**: shared offer, no dupe.
+* [ ] **Two networks on one storage block**: one storage tile with two *independent* cable runs (not
+      connected to each other) feeding two sinks; total delivered should not exceed the shared per-tick offer.
 * [ ] Performance sanity on a real base (optional).
 * [ ] **Fallback**: set `enablePacketModel=false`, restart, legacy behavior intact.
 

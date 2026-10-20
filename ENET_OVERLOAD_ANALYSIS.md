@@ -141,7 +141,7 @@ It is read **once** into `EnergyNetLocal.useLinearTransferModel` (`public static
 The solved node value is **not a voltage** — it is the energy allocated to that node. For a sink `amount == voltage == V`. Consequences:
 
 - cable length does not reduce delivered energy (loss only decides the split between multiple sinks);
-- `Node.currentIn/currentOut` are derived from allocation potentials and are dimensionally meaningless (an MFSU→copper cable→LV machine yields `currentIn ≈ 512`, `currentIn * voltage` in the hundreds of thousands);
+- `Node.currentIn/currentOut` are derived from allocation potentials and are dimensionally meaningless (an MFSU→copper cable→LV machine yields a meaningless `currentIn`, with `currentIn * voltage` in the hundreds of thousands);
 - multiple same-tier sources **aggregate**: two BatBoxes (2×32) feeding one LV machine produce a single `Change` of 64.
 
 ### 4.2 `true` — physical voltage/current model
@@ -156,7 +156,7 @@ Worked examples (one cable hop, `loss = 0.2`):
 
 | Setup | Linear result |
 |---|---|
-| MFSU (512 EU/t, tier 3) → LV machine (tier 1) | `V ≈ 102V`, `amount ≈ 327 EU/t` → machine explodes and copper cable melts |
+| MFE (512 EU/t, tier 3) → LV machine (tier 1) | `V ≈ 102V`, `amount ≈ 327 EU/t` → machine explodes and copper cable melts |
 | 2× BatBox (32 EU/t each, tier 1) → one LV machine | node ≈ 26V, `amount ≈ 21 EU/t` → nothing happens (correct per-packet) |
 | long tier-1 run | voltage sags, delivered energy drops (the "with energy loss" part) |
 
@@ -451,9 +451,9 @@ Discovered in-game: an IC2 machine (e.g. a Macerator) with 64 transformer upgrad
   down to 20 (a deliberate overflow guard).
 - The linear model's `Grid.populateNetworkMatrix()` sets `R_sink = getPowerFromTier(node.getTier())`,
   i.e. `getPowerFromTier(20) ≈ 8.8e12 Ω`.
-- A real source (MFSU: 512 V, ~128 Ω internal resistance) then sees the sink as an open circuit:
+- A real source (MFE: 512 V, ~128 Ω internal resistance) then sees the sink as an open circuit:
   `V_sink ≈ 512 V`, `P ≈ V² / R_sink ≈ 3e-8 EU/t`. The machine never charges, so it never runs.
-- Practical threshold on an MFSU: a base machine (2 EU/t) needs tier ≤ ~7 (≈6 transformer upgrades);
+- Practical threshold on an MFE: a base machine (2 EU/t) needs tier ≤ ~7 (≈6 transformer upgrades);
   an Advanced Machine (6 EU/t) needs tier ≤ ~6 (≈5). Beyond that it starves.
 
 This is **pre-existing IC2 linear-model behaviour** — it reproduces with `misc/useLinearTransferModel=true`
@@ -506,7 +506,7 @@ category of `config/ic2tweaks.cfg`.
 
 ### 10.3 Machine explosions (`enableEnetExplosions`)
 
-- [ ] MFSU (tier 3) → LV machine, direct or via glass fibre: the machine explodes (2.5 blast) and drops
+- [ ] MFSU (tier 4) → LV machine, direct or via glass fibre: the machine explodes (2.5 blast) and drops
       nothing.
 - [ ] MFE (tier 2) → LV machine: explodes.
 - [ ] BatBox (tier 1) → LV machine: **no** explosion.
@@ -566,7 +566,7 @@ category of `config/ic2tweaks.cfg`.
 These are consequences of forcing IC2's linear transfer model, not of the overload rules themselves.
 Reproduce them with `misc/useLinearTransferModel=true` and no addon to confirm.
 
-- [ ] A machine with many transformer upgrades (6+ on an MFSU; 64 is the extreme) draws almost no
+- [ ] A machine with many transformer upgrades (6+ on an MFE; 64 is the extreme) draws almost no
       power and never runs — see gap 13. Lower the upgrade count and confirm it powers normally.
 - [ ] A machine upgraded to a higher tier but fed at a lower voltage charges more slowly than the same
       machine at its default tier (the linear model derives the sink resistance from the tier).
