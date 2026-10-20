@@ -57,6 +57,10 @@ model is what you see: solved voltages (roughly 80% of the tier), and machines w
 upgrades still starve. With packet mode active, `NodeStats.getVoltage()` reports rated tier volts
 (32/128/512/2048) by default — set `packetModelTierVoltage=true` for tier indices (1/2/3/4).
 
+Packet-mode stats are per current tick, like 1.12.2: once a machine's buffer is full and no packet flows,
+the meter reads 0. The legacy model kept the last solved voltage, so a storage block that read a voltage
+while idle in legacy mode can read 0 in packet mode; measure while the machine is actively consuming.
+
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 

@@ -789,7 +789,10 @@ Behavior notes for validation:
 * Source offers are capped once per tile (`min(offered, powerFromTier(tier) × packets)`) and shared across
   the grids the tile feeds; the adapter draws only the used amount.
 * `getNodeStats` is read-only and returns zeros until the first packet tick (no lazy rebuild on the stats
-  path); client-side stats remain zero, as before.
+  path); client-side stats remain zero, as before. It is also **per current tick** (1.12.2 semantics): a
+  node with no packet on that tick reports zero. The legacy model persisted the last solved voltage, so an
+  idle machine/storage block that reads a voltage in legacy mode will read 0 in packet mode once its buffer
+  is full. Measure while the machine is actively consuming or immediately after placing it.
 * EnergyControl is the only pack mod that modifies cabling/storage internals (see §11.6); its storage
   display is the first in-game canary.
 * The 1.7.10 loss constants still come from the live graph; §10.1 remains pending.
@@ -808,6 +811,7 @@ Result (2026-10-19): **ALL PASS**.
 | MFSU → copper cable → LV sink | copper cable melted; sink **survived** (2.8.222 suppression) |
 | 2×BatBox → one LV sink | no explosion; stats `in=63.2`, `voltage=32.0` |
 | 2×BatBox → one tin cable (breakdown 33) → LV sink | no melt; cable stats `in/out=62.8`, `voltage=32.0` |
+| Source storage block stats | `out=31.6`, `voltage=32.0` |
 | Cow at the overloaded tin cable | shock damage accumulated; health 0 |
 
 The aggregation canaries that motivated gap 1 are therefore validated in-game: two 32 EU/t packets do not
@@ -834,8 +838,9 @@ which is expected, not a packet-model result.
       default. EnergyControl is a dead mod and is out of scope.
 * [ ] **EU meter / `NodeStats`**: rated volts (32/128/512), plausible energy in/out.
 * [ ] **Save/reload and chunk unload/reload**: no stale paths, dupes or crashes.
-* [ ] **Two networks on one storage block**: one storage tile with two *independent* cable runs (not
-      connected to each other) feeding two sinks; total delivered should not exceed the shared per-tick offer.
+* [ ] **Multi-grid source** (optional): only a source with multiple output faces or a meta-delegate can
+      belong to two independent grids — a storage block has a single output face and cannot. If such a source
+      exists, check that the shared per-tick offer is not duplicated across the grids.
 * [ ] Performance sanity on a real base (optional).
 * [ ] **Fallback**: set `enablePacketModel=false`, restart, legacy behavior intact.
 
