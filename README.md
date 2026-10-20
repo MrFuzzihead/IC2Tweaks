@@ -63,6 +63,11 @@ while idle in legacy mode can read 0 in packet mode; measure while the machine i
 A nearly full sink also receives only its remaining demand (demand cap), so the reported tier can be 0 even
 while a small amount flows.
 
+`NodeStats` energy in/out **sums** the packets, while `voltage` is the rated tier of the **largest packet**,
+rounded up: 33–128 EU/t → 128 V, 129–512 → 512 V. Two 32 EU/t packets read as 62 EU/t total at 32 V, not
+64 EU/t at 128 V. A demand-capped 49 EU/t packet from an MFSU reads 128 V even though the MFSU's own tier
+is 2048.
+
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 

@@ -819,6 +819,19 @@ Result (2026-10-19): **ALL PASS**.
 The aggregation canaries that motivated gap 1 are therefore validated in-game: two 32 EU/t packets do not
 add up to 64 for explosion or melt checks, and a melting cable suppresses the sink explosion.
 
+Production-pack corroboration (2026-10-19, packet mode):
+
+* **MFSU → thermal centrifuge, steady 49 EU/t**: the source packet is demand-capped to ~49 EU/t, so
+  `getTierFromPower(49) = 2` and the meter reports **128 V**, not the MFSU's 2048 V. A 2048 packet only
+  appears when the sink actually demands one (e.g. an empty large buffer).
+* **2×BatBox → 7-overclocker macerator (~62 EU/t)**: each source path carries a 32 EU/t packet (31 EU/t
+  after loss), so the cable entering the macerator reports `energyIn=62` but `voltage=32` — the **max
+  packet**, not the 62 sum. The tin cable (breakdown 33) survives. A single 62 EU/t packet would be tier 2
+  (128 V) and melt it.
+
+These two readings are exactly the per-packet behavior gap 1 was about: totals sum, fault/voltage decisions
+use the largest packet.
+
 Still manual because they need specific mod/pack setups: transformer packet conversion, a machine with many
 transformer upgrades (tier-starvation fix), EnergyControl's storage display, and Hodgepodge's reactor source
 changes.
