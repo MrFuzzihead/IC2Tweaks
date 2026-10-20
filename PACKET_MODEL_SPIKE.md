@@ -600,6 +600,10 @@ for every existing install — the rollout is a planned event, not a code detail
   key for one more cycle if pack authors need it).
 * Release notes must call out the delivery changes (multi-injection, demand caps, source throttling) and the
   `NodeStats` deviation from §10.2; `/ic2tweaks status` should print the active model.
+* **Config migration:** once `enablePacketModel=false` exists in a user's config, changing the code default
+  does not flip them (Forge keeps the stored value). Phase 4 needs a migration strategy — e.g. a tri-state
+  `packetModelMode=auto|legacy|packet` (new key, defaults to `auto` → packet) or a config version bump — so
+  the new default reaches existing installs while an explicit legacy choice is preserved.
 * When packet mode is on, stop forcing `useLinearTransferModel` (gap 10); when off, keep today's behavior
   exactly.
 * **Recommendation: off now, on at Phase 4, key retained for one release.**
