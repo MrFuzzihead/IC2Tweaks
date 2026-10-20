@@ -786,7 +786,9 @@ Behavior notes for validation:
 * State is rebuilt on the first tick after any `Grid.invalidate`; a grid removed by another grid's effects
   is skipped via an `EnergyNetLocal.grids` membership check.
 * Source offers are capped once per tile (`min(offered, powerFromTier(tier) × packets)`) and shared across
-  the grids the tile feeds; the adapter draws only the used amount.
+  the grids the tile feeds; the adapter draws only the used amount, and shuffles the grid list each tick
+  when there is more than one grid (1.12.2's `EnergyNetLocal.shuffleGrids()`) so the first grid cannot
+  monopolize a shared offer.
 * `getNodeStats` is read-only and returns zeros until the first packet tick (no lazy rebuild on the stats
   path); client-side stats remain zero, as before. It is also **per current tick** (1.12.2 semantics): a
   node with no packet on that tick reports zero. The legacy model persisted the last solved voltage, so an
@@ -812,6 +814,7 @@ Result (2026-10-19): **ALL PASS**.
 | 2×BatBox → one LV sink | no explosion; stats `in=63.2`, `voltage=32.0` |
 | 2×BatBox → one tin cable (breakdown 33) → LV sink | no melt; cable stats `in/out=62.8`, `voltage=32.0` |
 | Source storage block stats | `out=31.6`, `voltage=32.0` |
+| MFE → MV transformer → two independent CESU output grids | both charged (`A≈4.8k`, `B≈5.2k` EU); grid order shuffled |
 | Cow at the overloaded tin cable | shock damage accumulated; health 0 |
 
 The aggregation canaries that motivated gap 1 are therefore validated in-game: two 32 EU/t packets do not
@@ -826,6 +829,10 @@ Production-pack corroboration (2026-10-19, packet mode):
   after loss), so the cable entering the macerator reports `energyIn=62` but `voltage=32` — the **max
   packet**, not the 62 sum. The tin cable (breakdown 33) survives. A single 62 EU/t packet would be tier 2
   (128 V) and melt it.
+* **MFE → MV transformer → two furnaces**: the MFE input packet is only 4.6/8.8 EU/t (the transformer buffers
+  and tops up), so its voltage reads 0/32 (tier 0/1); the transformer's output faces emit 128 V (tier 2)
+  packets, and the two output grids are shared/shuffled. The voltage follows the **packet at the block you
+  measure**, not the source's rated tier.
 
 These two readings are exactly the per-packet behavior gap 1 was about: totals sum, fault/voltage decisions
 use the largest packet.
@@ -850,9 +857,9 @@ The default is now packet mode. Run this short pack-level pass and compare again
       legacy fallback. EnergyControl is a dead mod and is out of scope.
 * [ ] **EU meter / `NodeStats`**: rated volts (32/128/512), plausible energy in/out.
 * [ ] **Save/reload and chunk unload/reload**: no stale paths, dupes or crashes.
-* [ ] **Multi-grid source** (optional): only a source with multiple output faces or a meta-delegate can
-      belong to two independent grids — a storage block has a single output face and cannot. If such a source
-      exists, check that the shared per-tick offer is not duplicated across the grids.
+* [x] **Multi-grid source**: validated with an MFE → MV transformer (which emits on every non-input face)
+      feeding two independent CESU grids; both charged, so the shared offer is split and the grid order is
+      shuffled. A storage block has a single output face and cannot exercise this.
 * [ ] Performance sanity on a real base (optional).
 * [ ] **Fallback**: set `enablePacketModel=false`, restart, legacy behavior intact.
 
@@ -871,6 +878,8 @@ release so the fallback remains available.
 * The legacy fallback was re-checked: `false` loads only the legacy linear/overload mixins, logs
   `Energy-net model: legacy per-node`, and reaches `Done` without errors.
 * `./gradlew build` is green with 38 tests.
+* Multi-grid sources work: the MFE → MV transformer canary feeds two independent output grids (both CESUs
+  charged), using the shared offer ledger plus 1.12.2's per-tick grid shuffle.
 * Public multi-packet API remains unpublished (internal hook dormant); Hodgepodge is deferred and
   EnergyControl is out of scope.
 

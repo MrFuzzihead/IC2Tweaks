@@ -18,8 +18,10 @@ import cpw.mods.fml.common.gameevent.TickEvent;
 import ic2.api.energy.EnergyNet;
 import ic2.api.energy.NodeStats;
 import ic2.api.energy.tile.IEnergySink;
+import ic2.api.energy.tile.IEnergySource;
 import ic2.core.Ic2Items;
 import ic2.core.block.wiring.TileEntityElectricBlock;
+import ic2.core.block.wiring.TileEntityTransformer;
 
 /**
  * Temporary Phase-3 canary harness. Enabled with {@code -Dic2tweaks.canary=true}; builds four IC2 rigs in
@@ -34,6 +36,7 @@ public final class CanaryHarness {
     private World world;
     private int ticks;
     private boolean started;
+    private boolean reported;
     private EntityCow shockCow;
 
     @SubscribeEvent
@@ -51,17 +54,21 @@ public final class CanaryHarness {
             started = true;
             return;
         }
+        if (reported) {
+            return;
+        }
         if (++ticks < WAIT_TICKS) {
             return;
         }
+        reported = true;
         report();
-        server.stopServer();
+        server.initiateShutdown();
     }
 
     private void buildRigs() {
         // Clear the harness area so repeated runs start from a clean slate.
         for (int x = -2; x <= 3; x++) {
-            for (int z = -1; z <= 20; z++) {
+            for (int z = -1; z <= 26; z++) {
                 world.setBlockToAir(x, Y, z);
             }
         }
@@ -92,6 +99,14 @@ public final class CanaryHarness {
         charge(source4a, 40_000.0D, 1);
         charge(source4b, 40_000.0D, 1);
 
+        // 5. MFE -> MV transformer (step-down) with two independent output grids: the transformer is a
+        // multi-grid source; the ledger must share its 128 EU/t offer and the grid order must shuffle.
+        TileEntity mfe5 = place(Ic2Items.mfeUnit, 0, 24, ForgeDirection.EAST);
+        TileEntity transformer5 = place(Ic2Items.mvTransformer, 1, 24, ForgeDirection.WEST);
+        TileEntity sink5a = place(Ic2Items.cesuUnit, 2, 24, ForgeDirection.DOWN);
+        TileEntity sink5b = place(Ic2Items.cesuUnit, 1, 25, ForgeDirection.DOWN);
+        charge(mfe5, 1_000_000.0D, 3);
+
         shockCow = new EntityCow(world);
         shockCow.setPosition(0.5D, Y, 18.5D);
         world.spawnEntityInWorld(shockCow);
@@ -120,7 +135,9 @@ public final class CanaryHarness {
 
     private TileEntity place(ItemStack stack, int x, int z, ForgeDirection facing) {
         TileEntity tile = place(stack, x, z);
-        if (tile instanceof TileEntityElectricBlock) {
+        if (tile instanceof TileEntityTransformer) {
+            ((TileEntityTransformer) tile).setFacing((short) facing.ordinal());
+        } else if (tile instanceof TileEntityElectricBlock) {
             ((TileEntityElectricBlock) tile).setFacing((short) facing.ordinal());
         }
         return tile;
@@ -133,6 +150,17 @@ public final class CanaryHarness {
     }
 
     private void report() {
+        logStorage("S3 source A", world.getTileEntity(-1, Y, 12));
+        logStorage("S3 source B", world.getTileEntity(1, Y, 12));
+        logStorage("S3 sink", world.getTileEntity(0, Y, 12));
+        logStorage("S4 source A", world.getTileEntity(-1, Y, 18));
+        logStorage("S4 source B", world.getTileEntity(1, Y, 18));
+        logStorage("S4 sink", world.getTileEntity(0, Y, 19));
+        logStorage("S5 MFE", world.getTileEntity(0, Y, 24));
+        logStorage("S5 transformer", world.getTileEntity(1, Y, 24));
+        logStorage("S5 CESU A", world.getTileEntity(2, Y, 24));
+        logStorage("S5 CESU B", world.getTileEntity(1, Y, 25));
+
         check("direct MFSU -> LV sink explodes", world.isAirBlock(1, Y, 0), blockName(1, 0));
         check("copper cable on MFSU path melts", world.isAirBlock(1, Y, 6), blockName(1, 6));
         check(
@@ -198,10 +226,38 @@ public final class CanaryHarness {
             }
         }
 
+        TileEntity cesuA = world.getTileEntity(2, Y, 24);
+        TileEntity cesuB = world.getTileEntity(1, Y, 25);
+        double energyA = cesuA instanceof TileEntityElectricBlock ? ((TileEntityElectricBlock) cesuA).energy : -1.0D;
+        double energyB = cesuB instanceof TileEntityElectricBlock ? ((TileEntityElectricBlock) cesuB).energy : -1.0D;
+        IC2Tweaks.LOG.info("[canary] multi-grid transformer sinks: A={} B={}", energyA, energyB);
+        check(
+            "multi-grid transformer feeds both output grids",
+            energyA > 0.0D && energyB > 0.0D,
+            "A=" + energyA + " B=" + energyB);
+
         if (failures.isEmpty()) {
             IC2Tweaks.LOG.info("[canary] RESULT: ALL PASS");
         } else {
             IC2Tweaks.LOG.error("[canary] RESULT: {} FAILURE(S): {}", failures.size(), failures);
+        }
+    }
+
+    private void logStorage(String name, TileEntity tile) {
+        if (tile instanceof TileEntityElectricBlock) {
+            TileEntityElectricBlock storage = (TileEntityElectricBlock) tile;
+            double offered = tile instanceof IEnergySource ? ((IEnergySource) tile).getOfferedEnergy() : -1.0D;
+            double demanded = tile instanceof IEnergySink ? ((IEnergySink) tile).getDemandedEnergy() : -1.0D;
+            IC2Tweaks.LOG
+                .info("[canary] {}: energy={} offered={} demanded={}", name, storage.energy, offered, demanded);
+        } else if (tile != null) {
+            IC2Tweaks.LOG.info(
+                "[canary] {}: {}",
+                name,
+                tile.getClass()
+                    .getSimpleName());
+        } else {
+            IC2Tweaks.LOG.info("[canary] {}: null", name);
         }
     }
 

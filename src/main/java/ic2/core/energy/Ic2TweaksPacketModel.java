@@ -64,10 +64,14 @@ public final class Ic2TweaksPacketModel {
 
         // 1.12.2's runSyncStep(enet): cap every source tile once, shared across all grids it feeds.
         PacketOfferLedger<Tile> offers = new PacketOfferLedger<>();
+        World world = null;
         for (Grid grid : grids) {
             GridState state = state(grid);
             if (state == null) {
                 continue;
+            }
+            if (world == null) {
+                world = state.world();
             }
             for (int node : state.sourceNodes) {
                 Tile tile = state.tile(node);
@@ -79,6 +83,12 @@ public final class Ic2TweaksPacketModel {
             }
         }
 
+        // 1.12.2's EnergyNetLocal.shuffleGrids(): a source tile can belong to several grids, so the
+        // first grid would otherwise consume its whole shared offer every tick.
+        if (world != null && grids.size() > 1) {
+            Collections.shuffle(grids, world.rand);
+        }
+
         for (Grid grid : grids) {
             // An earlier grid's effects may have removed this grid from the energy net.
             if (!energyNet.grids.contains(grid)) {
@@ -88,8 +98,8 @@ public final class Ic2TweaksPacketModel {
             if (state == null) {
                 continue;
             }
-            World world = state.world();
-            if (world == null || world.isRemote) {
+            World gridWorld = state.world();
+            if (gridWorld == null || gridWorld.isRemote) {
                 continue;
             }
 
@@ -111,8 +121,8 @@ public final class Ic2TweaksPacketModel {
                 inputs.setSink(node, sink.getDemandedEnergy(), sink.getSinkTier());
             }
 
-            boolean shufflePaths = (world.getTotalWorldTime() & 3L) != 0L;
-            PacketTickResult result = state.model.tick(inputs, new Handler(state), world.rand, shufflePaths);
+            boolean shufflePaths = (gridWorld.getTotalWorldTime() & 3L) != 0L;
+            PacketTickResult result = state.model.tick(inputs, new Handler(state), gridWorld.rand, shufflePaths);
 
             for (int node : state.sourceNodes) {
                 Tile tile = state.tile(node);
