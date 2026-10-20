@@ -810,6 +810,28 @@ Still manual because they need specific mod/pack setups: transformer packet conv
 transformer upgrades (tier-starvation fix), EnergyControl's storage display, and Hodgepodge's reactor source
 changes.
 
+### 12.4 Phase 4 gate (manual, before the default flip)
+
+The calculation layer is covered by the 38 tests plus the §12.3 canaries. Before changing the default, run
+this short pack-level pass with `enablePacketModel=true` and compare against `false` where noted:
+
+* [ ] **Transformer**: MFSU → HV transformer → MV machine; correct throughput and no false explosion; also
+      test step-up mode if the pack uses it.
+* [ ] **Upgraded machine**: 5–6 transformer upgrades fed by an MFSU; it charges and runs (the gap-13 fix).
+* [ ] **Hodgepodge reactor (highest risk)**: compare reactor EU/t with packet mode on/off. Hodgepodge's reactor
+      mixins can make a source offer more than one tier packet; 1.12.2's single-packet cap would throttle it.
+      If output drops, decide whether to exempt/represent multi-packet sources before flipping the default.
+* [ ] **EnergyControl**: storage/cable display and upgrade-kit behavior still work; it is the pack's only
+      wiring-internal modifier.
+* [ ] **EU meter / `NodeStats`**: rated volts (32/128/512), plausible energy in/out.
+* [ ] **Save/reload and chunk unload/reload**: no stale paths, dupes or crashes.
+* [ ] **Two networks on one storage block**: shared offer, no dupe.
+* [ ] Performance sanity on a real base (optional).
+* [ ] **Fallback**: set `enablePacketModel=false`, restart, legacy behavior intact.
+
+Phase 4 code (default flip, legacy retirement) can be prepared now, but the default should not flip until this
+list is green.
+
 ---
 
 ## 13. Residual gaps after the packet model (and the aggregation question)
