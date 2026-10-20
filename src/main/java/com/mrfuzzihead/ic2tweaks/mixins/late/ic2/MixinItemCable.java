@@ -30,10 +30,14 @@ public abstract class MixinItemCable {
     @Inject(method = "addInformation", at = @At("RETURN"), remap = false)
     private void ic2tweaks$addCableLoss(ItemStack itemStack, EntityPlayer player, List<String> info, boolean advanced,
         CallbackInfo ci) {
-        if (!EnetOverloadConfig.enabled || !EnergyNetLocal.useLinearTransferModel) {
+        if (!EnetOverloadConfig.enabled) {
             return;
         }
-        double loss = EnetCableData.conductionLoss(itemStack.getItemDamage());
+        if (!EnetOverloadConfig.packetModel && !EnergyNetLocal.useLinearTransferModel) {
+            return;
+        }
+        double loss = EnetOverloadConfig.packetModel ? EnetCableData.conductionLoss1212(itemStack.getItemDamage())
+            : EnetCableData.conductionLoss(itemStack.getItemDamage());
         if (loss <= 0) {
             return;
         }

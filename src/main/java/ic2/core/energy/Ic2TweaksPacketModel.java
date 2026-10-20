@@ -15,6 +15,7 @@ import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import com.mrfuzzihead.ic2tweaks.enet.EnetCableData;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverload;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketGraph;
@@ -33,6 +34,7 @@ import ic2.api.energy.tile.IEnergyConductor;
 import ic2.api.energy.tile.IEnergySink;
 import ic2.api.energy.tile.IEnergySource;
 import ic2.core.IC2DamageSource;
+import ic2.core.block.wiring.TileEntityCable;
 
 /**
  * Live adapter between IC2 1.7.10's energy net and the pure packet model.
@@ -458,7 +460,7 @@ public final class Ic2TweaksPacketModel {
                     Integer from = idByNode.get(node);
                     Integer to = idByNode.get(link.nodeB);
                     if (from != null && to != null) {
-                        builder.link(from, to, link.loss);
+                        builder.link(from, to, packetLinkLoss(node, link.nodeB));
                     }
                 }
             }
@@ -467,6 +469,25 @@ public final class Ic2TweaksPacketModel {
             this.model = new PacketGrid(graph, EnetOverloadConfig.packetModelRoundLossDown);
             this.model.rebuild();
             this.world = worldOf(tilesById);
+        }
+
+        private static double packetLinkLoss(Node a, Node b) {
+            return (packetInnerLoss(a) + packetInnerLoss(b)) / 2.0D;
+        }
+
+        /** 1.12.2 inner loss: 0.002 for source/sink; 1.12.2 table for IC2 cables. */
+        private static double packetInnerLoss(Node node) {
+            if (node.nodeType == NodeType.Source || node.nodeType == NodeType.Sink) {
+                return EnetCableData.NON_CONDUCTOR_INNER_LOSS;
+            }
+            if (node.tile.entity instanceof TileEntityCable) {
+                return EnetCableData.conductionLoss1212(((TileEntityCable) node.tile.entity).cableType);
+            }
+            if (node.tile.entity instanceof IEnergyConductor) {
+                // Non-IC2 conductors have no 1.12.2 equivalent; use their own value.
+                return ((IEnergyConductor) node.tile.entity).getConductionLoss();
+            }
+            return EnetCableData.NON_CONDUCTOR_INNER_LOSS;
         }
 
         Tile tile(int nodeId) {

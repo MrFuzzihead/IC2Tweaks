@@ -154,6 +154,9 @@ numbers under it.
 | `misc/roundEnetLoss` | absent | present (`roundLossDown`) |
 | `IMultiEnergySource` | absent | present |
 
+**Later update:** packet mode now uses the 1.12.2 column (0.002 source/sink inner loss and the type-based
+cable table, where insulation does not change loss); the legacy fallback retains the 1.7.10 values.
+
 **Correction to §11.2 of `ENET_OVERLOAD_ANALYSIS.md`:** 1.12.2's source/sink inner loss is **0.002**,
 not 0.4. The shape of the loss is identical (link loss = mean of the endpoints' inner losses, and
 `emit` charges `amount − rejected + path.loss`), but a direct BatBox→BatBox run loses ≈2.5 EU in
@@ -507,7 +510,7 @@ This is a *global delivery rewrite*, so the blast radius is every IC2 energy par
 
 | # | Decision | Outcome |
 |---|---|---|
-| 1 | Loss constants | Keep 1.7.10 `0.4`/`0.2` for now; make it configurable and plan for 1.12.2 `0.002`/`0.001` to become the eventual default |
+| 1 | Loss constants | **Moved after Phase 4:** packet mode uses 1.12.2's `0.002` inner loss and type-based cable table; the legacy fallback keeps 1.7.10 `0.4`/`0.2` |
 | 2 | `NodeStats.voltage` | Rated volts by default; config to opt into raw tier; revisit later |
 | 3 | Gap 4 suppression | Match 2.8.222: suppress the sink explosion when a conductor on that path overloads |
 | 4 | Rollout | **Done in Phase 4:** `enablePacketModel=true` by default; `false` retained as a one-release legacy fallback |
@@ -539,10 +542,12 @@ loss and barely change (MFSU + 10 copper hops: 2.4 vs 2.002); short/direct paths
   making direct connections lossless-feeling. Cost: a second delivery change stacked on the first, the old
   numbers become wrong, and the change must be scoped to the packet-model path loss only — `Node.getInnerLoss()`
   is also read by the legacy linear solver, so a blanket mixin would silently change legacy mode too.
-* **Recommendation: keep 1.7.10 constants for Phases 1–3.** If validation says machine-adjacent loss feels
-  wrong versus 1.12.2, add `packetModelMachineLoss` (0.4 default, 0.002 optional) applied **only when building
-  packet paths**, leaving legacy mode untouched. A/B it in-game before deciding; do not couple the choice to
-  the packet-model landing.
+* **Recommendation (Phases 1–3): keep 1.7.10 constants.** This isolated the refactor.
+* **Implemented after Phase 4:** packet mode now uses the 1.12.2 `0.002` source/sink inner loss and the
+  type-based cable table (copper 0.2, gold 0.4, HV 0.8, tin 0.2, glass 0.025; insulated tin 0.2 instead of
+  the 1.7.10 0.025 quirk). The legacy fallback keeps 1.7.10. Direct machine links are effectively lossless
+  (0.002, floored to 0 by the default `roundLossDown=true`). No new config key; the active model selects the
+  table and the tooltip follows it.
 
 ### 10.2 `NodeStats.voltage` — 1.12.2 tier vs 1.7.10 volts
 
@@ -738,8 +743,8 @@ default-off flag, and Phase 4 flips that default on.
 
 Decisions encoded here:
 
-* **Loss constants** come from the graph the adapter builds (Phase 2 will use 1.7.10's `0.4`/`0.2`
-  values, configurable later per §10.1).
+* **Loss constants**: packet mode builds links with 1.12.2's `0.002` inner loss and the type-based cable
+  table; the legacy fallback uses the 1.7.10 values (§10.1).
 * **Gap 4 suppression** is implemented in `PacketGrid.applyEffects` (a path with a conductor overload can
   never add its sink to `sinksToExplode`).
 * **Multi-packet** distribution is implemented and `PacketInputs.sourcePackets` defaults to 1; the public
@@ -826,9 +831,10 @@ Production-pack corroboration (2026-10-19, packet mode):
   `getTierFromPower(49) = 2` and the meter reports **128 V**, not the MFSU's 2048 V. A 2048 packet only
   appears when the sink actually demands one (e.g. an empty large buffer).
 * **2×BatBox → 7-overclocker macerator (~62 EU/t)**: with `roundLossDown=false` each source path carries
-  a 32 EU/t packet (31 EU/t after loss), so the cable entering the macerator reports `energyIn=62` but
-  `voltage=32` — the **max packet**, not the 62 sum. With the shipped default `roundLossDown=true` the
-  short-path losses floor to zero and the same setup reads `energyIn=64`. Either way the tin cable
+  a 32 EU/t packet (31 EU/t after loss with the old 1.7.10 table), so the cable entering the macerator
+  reports `energyIn=62` but `voltage=32` — the **max packet**, not the 62 sum. With the current 1.12.2
+  cable table and `roundLossDown=false` it is ≈63.6 (direct ≈64.0); with the default `roundLossDown=true`
+  the short-path losses floor to zero and the same setup reads `energyIn=64`. Either way the tin cable
   (breakdown 33) survives; a single 64 EU/t packet would be tier 2 (128 V) and melt it.
 * **MFE → MV transformer → two furnaces**: the MFE input packet is only 4.6/8.8 EU/t (the transformer buffers
   and tops up), so its voltage reads 0/32 (tier 0/1); the transformer's output faces emit 128 V (tier 2)
@@ -837,7 +843,8 @@ Production-pack corroboration (2026-10-19, packet mode):
 
 These two readings are exactly the per-packet behavior gap 1 was about: totals sum, fault/voltage decisions
 use the largest packet. The canary table above uses the shipped `roundLossDown=true`; with `false`, the
-same totals are 63.2 / 62.8 / 31.6 instead of 64.0 / 64.0 / 32.0.
+same totals were 63.2 / 62.8 / 31.6 under the old 1.7.10 table; with the current 1.12.2 table they are
+≈64.0 / 63.6 / 32.0 (and the default `roundLossDown=true` floors them to 64.0 / 64.0 / 32.0).
 
 Still manual because they need specific mod/pack setups: transformer packet conversion, a machine with many
 transformer upgrades (tier-starvation fix), and Hodgepodge's reactor source changes (deferred). EnergyControl
@@ -882,6 +889,9 @@ release so the fallback remains available.
 * `./gradlew build` is green with 38 tests.
 * Multi-grid sources work: the MFE → MV transformer canary feeds two independent output grids (both CESUs
   charged), using the shared offer ledger plus 1.12.2's per-tick grid shuffle.
+* Post-Phase-4 loss update: packet mode uses 1.12.2's `0.002` source/sink inner loss and type-based cable
+  table (including tin 0.2 instead of the 1.7.10 insulated-tin 0.025 quirk); the legacy fallback keeps
+  1.7.10. The tooltip follows the active table.
 * Public multi-packet API remains unpublished (internal hook dormant); Hodgepodge is deferred and
   EnergyControl is out of scope.
 
@@ -928,7 +938,7 @@ fed by two 32 EU/t sources (cable does not melt at 64), and a cable that is a me
 | # | Gap | Impact | Disposition |
 |---|---|---|---|
 | 1 | Absorption policy is 1.7.10-adapted (insulated cables shock only while melting) | Shock only; melt/explosion thresholds are exact | Deliberate (§10, gap 14); revisit if 2x/3x insulation becomes usable |
-| 2 | Loss constants stay 1.7.10 `0.4`/`0.2` initially | Delivered energy on machine-adjacent hops; no fault-check impact | Config planned; eventual 1.12.2 defaults (§10.1) |
+| 2 | ~~Loss constants stay 1.7.10 initially~~ | Packet mode now uses 1.12.2 `0.002` inner loss + type-based cable table; direct machine links are effectively lossless | Legacy fallback keeps 1.7.10 (§10.1) |
 | 3 | `NodeStats.voltage` reports rated volts, not the 1.12.2 tier index | Display/API only; effects read path data | Deliberate (§10.2); config for strict tier |
 | 4 | No `ExplosionIC2.Type.Electrical` in 1.7.10 | Blast visuals/type only | Unavailable; plain blast is the closest match |
 | 5 | No public multi-packet source API yet | Third-party multi-packet sources cannot opt in | Phase 4 decision: internal support stays dormant; no API until a mod needs it (§10.5) |

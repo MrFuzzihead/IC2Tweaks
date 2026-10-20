@@ -63,16 +63,18 @@ while a small amount flows.
 
 `NodeStats` energy in/out **sums** the packets, while `voltage` is the rated tier of the **largest packet**,
 rounded up: 33–128 EU/t → 128 V, 129–512 → 512 V. Two 32 EU/t packets read as 64 EU/t total at 32 V with
-the default `roundLossDown=true` (62 EU/t if you set it false), not as one 64 EU/t packet at 128 V. A
-demand-capped 49 EU/t packet from an MFSU reads 128 V even though the MFSU's own tier is 2048.
+the default `roundLossDown=true`; with it false the total is ≈64.0 for a direct machine link or ≈63.6
+through a cable. They are not one 64 EU/t packet at 128 V. A demand-capped 49 EU/t packet from an MFSU
+reads 128 V even though the MFSU's own tier is 2048.
 
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 
-- Both models lose energy on links with the current 1.7.10 constants, including a direct
-  machine-to-machine connection. A BatBox feeding another BatBox loses about 1.2% of the transferred
-  energy (the 0.4 Ω link loss), and a source that drops below its output packet size (32 EU/t for a
-  BatBox) stops emitting, stranding the remainder.
+- Packet mode uses IC2 1.12.2's loss constants: a 0.002 EU source/sink inner loss and the type-based
+  cable table (copper 0.2, gold 0.4, HV 0.8, tin 0.2, glass 0.025; insulation does not change loss in
+  1.12.2). A direct machine-to-machine link is therefore 0.002 EU — effectively lossless, and floored to
+  zero by the default `roundLossDown=true`. The legacy fallback keeps the 1.7.10 constants (0.4 machine
+  links; 1.2% BatBox-to-BatBox loss) so it remains a true fallback.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
   upgrades (roughly 6+ on an MFE) draw almost no power. This is legacy-only; the packet model does not
   derive sink resistance from tier.
@@ -87,8 +89,9 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   values, so a junction or several sources feeding one cable can trip earlier than in 1.12.2 and two
   same-tier sources can trip the machine-explosion check. This is exactly what the packet model (the
   default) fixes; the fallback exists for one release only.
-- Insulated tin reports a conduction loss of 0.025 EU/block in IC2 1.7.10 (the same as glass fibre and
-  lower than bare tin); the tooltip shows that value verbatim so it matches the simulation.
+- In the **legacy fallback**, insulated tin reports 0.025 EU/block (the 1.7.10 quirk, lower than bare
+  tin). Packet mode uses 1.12.2's 0.2 for tin regardless of insulation; the tooltip follows the active
+  table.
 
 ## API
 

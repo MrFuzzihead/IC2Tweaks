@@ -17,6 +17,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import com.mrfuzzihead.ic2tweaks.enet.EnetCableData;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketGraph;
 import com.mrfuzzihead.ic2tweaks.enet.packet.PacketInjectionHandler;
@@ -49,6 +50,46 @@ class Ic2TweaksPacketModelTest {
         Field field = MainConfig.class.getDeclaredField("config");
         field.setAccessible(true);
         field.set(null, config);
+    }
+
+    @Test
+    void directMachineLinkUses1212InnerLoss() {
+        EnergyNetLocal energyNet = new EnergyNetLocal();
+        FakeSource sourceTileEntity = place(new FakeSource(), 0, 64, 0);
+        FakeSink sinkTileEntity = place(new FakeSink(), 1, 64, 0);
+        Tile sourceTile = new Tile(energyNet, sourceTileEntity);
+        Tile sinkTile = new Tile(energyNet, sinkTileEntity);
+        Node source = sourceTile.nodes.get(0);
+        Node sink = sinkTile.nodes.get(0);
+
+        link(source, sink, 1.0D); // the packet adapter replaces this with the 1.12.2 inner loss
+        Map<Integer, Node> rawNodes = new HashMap<>();
+        rawNodes.put(source.uid, source);
+        rawNodes.put(sink.uid, sink);
+        Ic2TweaksPacketModel.GridState state = new Ic2TweaksPacketModel.GridState(rawNodes);
+
+        List<PacketPath> paths = state.model.sourcePaths(state.sourceNodes.get(0));
+        assertEquals(1, paths.size());
+        assertEquals(EnetCableData.NON_CONDUCTOR_INNER_LOSS, paths.get(0).loss, 1e-9D);
+
+        PacketInputs inputs = new PacketInputs(state.graph.nodeCount());
+        inputs.setSource(state.sourceNodes.get(0), 32.0D, 1);
+        inputs.setSink(state.sinkNodes.get(0), 1000.0D, 1);
+        state.model.tick(inputs, new PacketInjectionHandler() {
+
+            @Override
+            public double inject(PacketPath path, double amount, int tier) {
+                return sinkTileEntity.injectEnergy(ForgeDirection.UNKNOWN, amount, tier);
+            }
+
+            @Override
+            public void draw(int sourceNode, double amount) {
+                sourceTileEntity.drawEnergy(amount);
+            }
+        }, new Random(0), false);
+
+        assertEquals(32.0D, sourceTileEntity.drawn, 1e-9D);
+        assertEquals(31.998D, sinkTileEntity.injected, 1e-9D);
     }
 
     @Test
@@ -85,8 +126,8 @@ class Ic2TweaksPacketModelTest {
 
         List<PacketPath> paths = state.model.sourcePaths(state.sourceNodes.get(0));
         assertEquals(1, paths.size());
-        // 1.7.10 inner losses: source/sink 0.4, copper 0.2 -> (0.3 + 0.3) path loss
-        assertEquals(0.6D, paths.get(0).loss, 1e-9D);
+        // 1.12.2 inner losses: source/sink 0.002, copper 0.2 -> (0.101 + 0.101) path loss
+        assertEquals(0.202D, paths.get(0).loss, 1e-9D);
 
         PacketInputs inputs = new PacketInputs(state.graph.nodeCount());
         inputs.setSource(state.sourceNodes.get(0), 32.0D, 1);
@@ -107,7 +148,7 @@ class Ic2TweaksPacketModelTest {
         PacketTickResult result = state.model.tick(inputs, handler, new Random(0), false);
 
         assertEquals(32.0D, sourceTileEntity.drawn, 1e-9D);
-        assertEquals(31.4D, sinkTileEntity.injected, 1e-9D);
+        assertEquals(31.798D, sinkTileEntity.injected, 1e-9D);
         assertTrue(result.conductorsToRemove.isEmpty());
         assertTrue(result.sinksToExplode.isEmpty());
         // 32 effective - 5 absorption = 27 shock energy on the cable's path
