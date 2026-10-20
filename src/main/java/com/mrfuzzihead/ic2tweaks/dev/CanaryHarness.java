@@ -59,6 +59,13 @@ public final class CanaryHarness {
     }
 
     private void buildRigs() {
+        // Clear the harness area so repeated runs start from a clean slate.
+        for (int x = -2; x <= 3; x++) {
+            for (int z = -1; z <= 20; z++) {
+                world.setBlockToAir(x, Y, z);
+            }
+        }
+
         // 1. MFSU -> BatBox directly: over-voltage explodes the sink.
         TileEntity mfsu1 = place(Ic2Items.mfsUnit, 0, 0, ForgeDirection.EAST);
         TileEntity sink1 = place(Ic2Items.batBox, 1, 0, ForgeDirection.DOWN);
@@ -160,6 +167,20 @@ public final class CanaryHarness {
                     stats.getEnergyIn() > 60.0D && stats.getEnergyIn() < 64.5D,
                     "in=" + stats.getEnergyIn());
                 check("packet stats report rated voltage", stats.getVoltage() == 32.0D, "v=" + stats.getVoltage());
+            }
+
+            TileEntity source3 = world.getTileEntity(-1, Y, 12);
+            if (source3 != null) {
+                NodeStats stats = EnergyNet.instance.getNodeStats(source3);
+                IC2Tweaks.LOG.info(
+                    "[canary] two-source storage stats: in={} out={} voltage={}",
+                    stats.getEnergyIn(),
+                    stats.getEnergyOut(),
+                    stats.getVoltage());
+                check(
+                    "source storage reports out + rated voltage",
+                    stats.getEnergyOut() > 30.0D && stats.getVoltage() == 32.0D,
+                    "out=" + stats.getEnergyOut() + " v=" + stats.getVoltage());
             }
 
             TileEntity cable4 = world.getTileEntity(0, Y, 18);

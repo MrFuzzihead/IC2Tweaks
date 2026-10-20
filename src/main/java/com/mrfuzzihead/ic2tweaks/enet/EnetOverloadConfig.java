@@ -25,11 +25,11 @@ public final class EnetOverloadConfig {
     public static boolean enabled = true;
 
     /**
-     * Experimental 1.12.2-style packet calculator. Off by default: when off, the legacy per-node effects
-     * path runs exactly as before. When on, the packet mixins replace the distribution tick and the legacy
-     * effect passes are not applied.
+     * 1.12.2-style packet calculator. On by default since Phase 4; set {@code false} for the legacy
+     * per-node model as a one-release fallback. When on, the packet mixins replace the distribution tick
+     * and the legacy effect passes are not applied.
      */
-    public static boolean packetModel = false;
+    public static boolean packetModel = true;
 
     /** Mirrors 1.12.2's {@code misc/roundEnetLoss}: floor each path's accumulated loss. */
     public static boolean packetModelRoundLossDown = false;
@@ -74,11 +74,11 @@ public final class EnetOverloadConfig {
         packetModel = configuration.getBoolean(
             "enablePacketModel",
             CATEGORY,
-            false,
-            "Experimental: replace IC2's per-node energy distribution with the 1.12.2 packet/path calculator. "
-                + "Fault checks (melt/shock/explosion) then use each path's own packet instead of per-node aggregates, "
-                + "so multiple sources no longer add up. When enabled, the legacy per-node effect passes and the "
-                + "useLinearTransferModel override are disabled. Requires a restart.");
+            true,
+            "Use the 1.12.2 packet/path calculator (default). Fault checks (melt/shock/explosion) use each path's "
+                + "own packet instead of per-node aggregates, so multiple sources no longer add up. Set this to false "
+                + "to use the legacy per-node model as a one-release fallback (it also forces IC2's "
+                + "useLinearTransferModel). Requires a restart.");
 
         packetModelRoundLossDown = configuration.getBoolean(
             "packetModelRoundLossDown",
@@ -117,9 +117,9 @@ public final class EnetOverloadConfig {
             "enableDemandCappedPackets",
             CATEGORY,
             false,
-            "Cap each injection at the sink's remaining demand (IC2 Experimental 1.12.2 packet sizing). "
-                + "This changes how much energy every machine receives and how much is returned to sources, "
-                + "so it is off by default.");
+            "Legacy model only: cap each injection at the sink's remaining demand. The packet model always "
+                + "does this as part of its distribution. This changes how much energy every machine receives "
+                + "and how much is returned to sources, so it is off by default.");
 
         if (configuration.hasChanged()) {
             configuration.save();

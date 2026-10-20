@@ -38,24 +38,22 @@ that changes to IC2 itself can be shipped and versioned independently.
 | Option | Default | Description |
 | ------ | ------- | ----------- |
 | `enableEnetOverload` | `true` | Master switch. Legacy mode forces IC2's `misc/useLinearTransferModel` to `true`; packet mode replaces the distribution with the 1.12.2 packet calculator instead |
-| `enablePacketModel` | `false` | Experimental 1.12.2 packet/path calculator. When on, melt/shock/explosion checks use each path's own packet (no aggregation), the legacy per-node passes are disabled, and the `useLinearTransferModel` override is skipped. Requires a restart |
+| `enablePacketModel` | `true` | 1.12.2 packet/path calculator (default). Melt/shock/explosion checks use each path's own packet (no aggregation), the legacy per-node passes are disabled, and the `useLinearTransferModel` override is skipped. Set `false` for the one-release legacy fallback. Requires a restart |
 | `packetModelRoundLossDown` | `false` | Packet model only: floor each path's accumulated loss, mirroring IC2 1.12.2's `misc/roundEnetLoss` |
 | `packetModelTierVoltage` | `false` | Packet model only: report 1.12.2's raw tier index from `NodeStats.getVoltage()` instead of the rated tier voltage |
 | `enableEnetExplosions` | `true` | Machines explode when they accept a packet above their tier's voltage |
 | `enableEnetCableMeltdown` | `true` | Cables melt when their carried energy exceeds the conductor breakdown energy |
 | `enableEnetShocks` | `true` | Living entities near an overloaded cable take electric shock damage |
-| `enableDemandCappedPackets` | `false` | Cap each injection at the sink's remaining demand (IC2 1.12.2 packet sizing). Off because it changes how much energy every machine receives |
+| `enableDemandCappedPackets` | `false` | Legacy model only: cap each injection at the sink's remaining demand. The packet model always does this as part of its distribution |
 
 Because the overload system changes global IC2 behaviour, it is **on by default**; set
-`enableEnetOverload=false` to disable it and restore stock IC2 behaviour. The default **legacy** model
-enables IC2's experimental lossy model; the opt-in **packet** model (`enablePacketModel=true`, restart
-required) replaces the per-node distribution with the 1.12.2 path/packet calculator, so fault checks use
-each path's packet instead of sums across sources (the gap-1 fix) and the linear model is left alone.
-
-**The packet model is off by default.** Until you set `enablePacketModel=true` and restart, the legacy
-model is what you see: solved voltages (roughly 80% of the tier), and machines with many transformer
-upgrades still starve. With packet mode active, `NodeStats.getVoltage()` reports rated tier volts
-(32/128/512/2048) by default — set `packetModelTierVoltage=true` for tier indices (1/2/3/4).
+`enableEnetOverload=false` to disable it and restore stock IC2 behaviour. The **packet** model is the
+default since Phase 4: it replaces the per-node distribution with the 1.12.2 path/packet calculator, so
+fault checks use each path's packet instead of sums across sources (the gap-1 fix) and the linear model is
+left alone. The legacy per-node model remains available with `enablePacketModel=false` (restart required)
+as a one-release fallback; in that mode voltages are solved values (roughly 80% of the tier) and machines
+with many transformer upgrades still starve. With packet mode, `NodeStats.getVoltage()` reports rated tier
+volts (32/128/512/2048) by default — set `packetModelTierVoltage=true` for tier indices (1/2/3/4).
 
 Packet-mode stats are per current tick, like 1.12.2: once a machine's buffer is full and no packet flows,
 the meter reads 0. The legacy model kept the last solved voltage, so a storage block that read a voltage
@@ -71,24 +69,24 @@ is 2048.
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 
-- IC2's linear model loses energy on every link, including a direct machine-to-machine connection. A
-  BatBox feeding another BatBox loses about 1.2% of the transferred energy (the link's 0.4 Ω inner
-  loss), and a source that drops below its output packet size (32 EU/t for a BatBox) stops emitting,
-  stranding the remainder.
+- Both models lose energy on links with the current 1.7.10 constants, including a direct
+  machine-to-machine connection. A BatBox feeding another BatBox loses about 1.2% of the transferred
+  energy (the 0.4 Ω link loss), and a source that drops below its output packet size (32 EU/t for a
+  BatBox) stops emitting, stranding the remainder.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
   upgrades (roughly 6+ on an MFE) draw almost no power. This is legacy-only; the packet model does not
   derive sink resistance from tier.
-- The packet model is experimental: `NodeStats` values are packet-based, and `getVoltage()` reports rated
-  volts unless `packetModelTierVoltage=true`; the mixins must be selected at startup (config change
-  requires a restart).
+- Packet mode is the default since Phase 4: `NodeStats` values are packet-based, and `getVoltage()` reports
+  rated volts unless `packetModelTierVoltage=true`; the mixins are selected at startup, so a config change
+  requires a restart. Set `enablePacketModel=false` for the legacy fallback.
 - Cable shock sensitivity: bare cables are graded (tin 8, copper/gold/HV 32) and insulated cables are
   shock-safe at any load — they only arc while they overload and melt. This differs from IC2 1.12.2's
   per-layer table because 1.7.10's 2x/3x insulated gold/HV items are remapped to a single layer on
   placement (`TileEntityCable.onLoaded()`), so gold/HV could never be insulated past 128 there.
-- Overload checks use 1.7.10's **per-node aggregate** values, not 1.12.2's per-source packet sizes. At a
-  junction or with several sources feeding one cable, the cable can trip earlier than it would in 1.12.2,
-  and two same-tier sources can trip the machine-explosion check. This is the remaining structural
-  divergence; a packet-based calculator is planned separately.
+- In the **legacy fallback** (`enablePacketModel=false`), overload checks use 1.7.10's per-node aggregate
+  values, so a junction or several sources feeding one cable can trip earlier than in 1.12.2 and two
+  same-tier sources can trip the machine-explosion check. This is exactly what the packet model (the
+  default) fixes; the fallback exists for one release only.
 - Insulated tin reports a conduction loss of 0.025 EU/block in IC2 1.7.10 (the same as glass fibre and
   lower than bare tin); the tooltip shows that value verbatim so it matches the simulation.
 
