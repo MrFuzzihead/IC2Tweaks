@@ -43,6 +43,10 @@ public final class EnetOverload {
     }
 
     public static void applyMachineOverloads(List<Injection> injections) {
+        if (EnetOverloadConfig.packetModel) {
+            // Packet mode owns distribution and effects; this legacy pass must stay inert.
+            return;
+        }
         if (!EnetOverloadConfig.enabled || !EnetOverloadConfig.explosions) {
             return;
         }
@@ -113,6 +117,73 @@ public final class EnetOverload {
             tier,
             power);
         explode(world, te.xCoord, te.yCoord, te.zCoord, power);
+    }
+
+    /**
+     * 1.12.2's {@code explodeTile} for packet mode: checks the graceful hooks on the main tile and each
+     * real sub-tile, then replaces the block and spawns the blast (without {@code destroy}, matching
+     * 1.12.2's {@code setBlockToAir} + {@code ExplosionIC2} order).
+     */
+    public static void explodePacketTile(TileEntity mainTile, List<TileEntity> positions, double packet) {
+        if (!EnetOverloadConfig.enabled || !EnetOverloadConfig.explosions || mainTile == null || positions == null) {
+            return;
+        }
+        World world = mainTile.getWorldObj();
+        if (world == null || world.isRemote || EnergyNet.instance == null) {
+            return;
+        }
+
+        int tier = EnergyNet.instance.getTierFromPower(packet);
+        for (TileEntity subTile : positions) {
+            if (subTile == null || subTile.isInvalid()) {
+                continue;
+            }
+            if (world.getTileEntity(subTile.xCoord, subTile.yCoord, subTile.zCoord) != subTile) {
+                continue;
+            }
+            if (mainTile instanceof IOverloadHandler && ((IOverloadHandler) mainTile).onOverload(tier)) {
+                continue;
+            }
+            if (subTile != mainTile && subTile instanceof IOverloadHandler
+                && ((IOverloadHandler) subTile).onOverload(tier)) {
+                continue;
+            }
+
+            float power = DEFAULT_EXPLOSION_POWER;
+            IExplosionPowerOverride override = null;
+            if (mainTile instanceof IExplosionPowerOverride) {
+                override = (IExplosionPowerOverride) mainTile;
+            } else if (subTile instanceof IExplosionPowerOverride) {
+                override = (IExplosionPowerOverride) subTile;
+            }
+            if (override != null) {
+                if (!override.shouldExplode()) {
+                    continue;
+                }
+                power = override.getExplosionPower(tier, power);
+            }
+
+            IC2Tweaks.LOG.info(
+                "Over-voltage: exploding {} at {}:{},{},{} (tier {}, power {})",
+                mainTile.getClass()
+                    .getSimpleName(),
+                world.provider.dimensionId,
+                subTile.xCoord,
+                subTile.yCoord,
+                subTile.zCoord,
+                tier,
+                power);
+            world.setBlockToAir(subTile.xCoord, subTile.yCoord, subTile.zCoord);
+            ExplosionIC2 explosion = new ExplosionIC2(
+                world,
+                null,
+                subTile.xCoord + 0.5D,
+                subTile.yCoord + 0.5D,
+                subTile.zCoord + 0.5D,
+                power,
+                EXPLOSION_DROP_RATE);
+            explosion.doExplosion();
+        }
     }
 
     /**

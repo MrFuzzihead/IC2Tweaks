@@ -56,6 +56,10 @@ public final class EnetCableEffects {
         if (!EnetOverloadConfig.enabled) {
             return;
         }
+        if (EnetOverloadConfig.packetModel) {
+            // The packet tick owns meltdown/shock; do not run the legacy per-node pass as well.
+            return;
+        }
         if (!EnetOverloadConfig.cableMeltdown && !EnetOverloadConfig.shocks) {
             return;
         }

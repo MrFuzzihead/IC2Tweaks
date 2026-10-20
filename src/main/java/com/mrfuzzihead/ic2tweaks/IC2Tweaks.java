@@ -37,6 +37,7 @@ public class IC2Tweaks {
         // Ensure the energy-net options exist in ic2tweaks.cfg even if the late mixin loader did not
         // read the file first (it usually does).
         EnetOverloadConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        LOG.info("Energy-net model: {}", EnetOverloadConfig.packetModel ? "packet (1.12.2-style)" : "legacy per-node");
 
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the
         // registry keeps track of the conductors IC2 has loaded.
@@ -44,6 +45,12 @@ public class IC2Tweaks {
         FMLCommonHandler.instance()
             .bus()
             .register(cableEffects);
+
+        if (Boolean.getBoolean("ic2tweaks.canary")) {
+            FMLCommonHandler.instance()
+                .bus()
+                .register(new com.mrfuzzihead.ic2tweaks.dev.CanaryHarness());
+        }
     }
 
     @Mod.EventHandler

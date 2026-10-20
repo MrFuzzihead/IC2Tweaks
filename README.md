@@ -37,36 +37,61 @@ that changes to IC2 itself can be shipped and versioned independently.
 
 | Option | Default | Description |
 | ------ | ------- | ----------- |
-| `enableEnetOverload` | `true` | Master switch. When on, the mixins are applied and IC2's `misc/useLinearTransferModel` is forced to `true` (ignoring `IC2.ini`) |
+| `enableEnetOverload` | `true` | Master switch. Legacy mode forces IC2's `misc/useLinearTransferModel` to `true`; packet mode replaces the distribution with the 1.12.2 packet calculator instead |
+| `enablePacketModel` | `true` | 1.12.2 packet/path calculator (default). Melt/shock/explosion checks use each path's own packet (no aggregation), the legacy per-node passes are disabled, and the `useLinearTransferModel` override is skipped. Set `false` for the one-release legacy fallback. Requires a restart |
+| `packetModelRoundLossDown` | `true` | Packet model only: floor each path's accumulated loss, matching IC2 1.12.2's default `misc/roundEnetLoss=true`; set `false` for fractional 1.7.10 losses |
+| `packetModelTierVoltage` | `false` | Packet model only: report 1.12.2's raw tier index from `NodeStats.getVoltage()` instead of the rated tier voltage |
 | `enableEnetExplosions` | `true` | Machines explode when they accept a packet above their tier's voltage |
 | `enableEnetCableMeltdown` | `true` | Cables melt when their carried energy exceeds the conductor breakdown energy |
 | `enableEnetShocks` | `true` | Living entities near an overloaded cable take electric shock damage |
-| `enableDemandCappedPackets` | `false` | Cap each injection at the sink's remaining demand (IC2 1.12.2 packet sizing). Off because it changes how much energy every machine receives |
+| `enableDemandCappedPackets` | `false` | Legacy model only: cap each injection at the sink's remaining demand. The packet model always does this as part of its distribution |
 
-Because the overload system changes global IC2 behaviour (and enables IC2's experimental lossy energy
-model), it is **on by default**; set `enableEnetOverload=false` to disable it and restore stock IC2
-behaviour. Cable meltdown and shocks only work while the linear transfer model is active, which the
-master switch forces.
+Because the overload system changes global IC2 behaviour, it is **on by default**; set
+`enableEnetOverload=false` to disable it and restore stock IC2 behaviour. The **packet** model is the
+default since Phase 4: it replaces the per-node distribution with the 1.12.2 path/packet calculator, so
+fault checks use each path's packet instead of sums across sources (the gap-1 fix) and the linear model is
+left alone. The legacy per-node model remains available with `enablePacketModel=false` (restart required)
+as a one-release fallback; in that mode voltages are solved values (roughly 80% of the tier) and machines
+with many transformer upgrades still starve. With packet mode, `NodeStats.getVoltage()` reports rated tier
+volts (32/128/512/2048) by default — set `packetModelTierVoltage=true` for tier indices (1/2/3/4).
+
+Packet-mode stats are per current tick, like 1.12.2: once a machine's buffer is full and no packet flows,
+the meter reads 0. The legacy model kept the last solved voltage, so a storage block that read a voltage
+while idle in legacy mode can read 0 in packet mode; measure while the machine is actively consuming.
+A nearly full sink also receives only its remaining demand (demand cap), so the reported tier can be 0 even
+while a small amount flows.
+
+`NodeStats` energy in/out **sums** the packets, while `voltage` is the rated tier of the **largest packet**,
+rounded up: 33–128 EU/t → 128 V, 129–512 → 512 V. Two 32 EU/t packets read as 64 EU/t total at 32 V with
+the default `roundLossDown=true`; with it false the total is ≈64.0 for a direct machine link or ≈63.6
+through a cable. They are not one 64 EU/t packet at 128 V. A demand-capped 49 EU/t packet from an MFSU
+reads 128 V even though the MFSU's own tier is 2048.
 
 Known limitations (a mix of pre-existing IC2 behaviour and documented port divergences; see
 `ENET_OVERLOAD_ANALYSIS.md` gaps 10, 13 and 1):
 
-- IC2's linear model loses energy on every link, including a direct machine-to-machine connection. A
-  BatBox feeding another BatBox loses about 1.2% of the transferred energy (the link's 0.4 Ω inner
-  loss), and a source that drops below its output packet size (32 EU/t for a BatBox) stops emitting,
-  stranding the remainder.
+- Packet mode uses IC2 1.12.2's loss constants: a 0.002 EU source/sink inner loss and the type-based
+  cable table (copper 0.2, gold 0.4, HV 0.8, tin 0.2, glass 0.025; insulation does not change loss in
+  1.12.2). A direct machine-to-machine link is therefore 0.002 EU — effectively lossless, and floored to
+  zero by the default `roundLossDown=true`. The legacy fallback keeps the 1.7.10 constants (0.4 machine
+  links; 1.2% BatBox-to-BatBox loss) so it remains a true fallback.
 - The linear model derives a sink's resistance from its tier, so machines with many transformer
-  upgrades (roughly 6+ on an MFSU) draw almost no power.
+  upgrades (roughly 6+ on an MFE) draw almost no power. This is legacy-only; the packet model does not
+  derive sink resistance from tier.
+- Packet mode is the default since Phase 4: `NodeStats` values are packet-based, and `getVoltage()` reports
+  rated volts unless `packetModelTierVoltage=true`; the mixins are selected at startup, so a config change
+  requires a restart. Set `enablePacketModel=false` for the legacy fallback.
 - Cable shock sensitivity: bare cables are graded (tin 8, copper/gold/HV 32) and insulated cables are
   shock-safe at any load — they only arc while they overload and melt. This differs from IC2 1.12.2's
   per-layer table because 1.7.10's 2x/3x insulated gold/HV items are remapped to a single layer on
   placement (`TileEntityCable.onLoaded()`), so gold/HV could never be insulated past 128 there.
-- Overload checks use 1.7.10's **per-node aggregate** values, not 1.12.2's per-source packet sizes. At a
-  junction or with several sources feeding one cable, the cable can trip earlier than it would in 1.12.2,
-  and two same-tier sources can trip the machine-explosion check. This is the remaining structural
-  divergence; a packet-based calculator is planned separately.
-- Insulated tin reports a conduction loss of 0.025 EU/block in IC2 1.7.10 (the same as glass fibre and
-  lower than bare tin); the tooltip shows that value verbatim so it matches the simulation.
+- In the **legacy fallback** (`enablePacketModel=false`), overload checks use 1.7.10's per-node aggregate
+  values, so a junction or several sources feeding one cable can trip earlier than in 1.12.2 and two
+  same-tier sources can trip the machine-explosion check. This is exactly what the packet model (the
+  default) fixes; the fallback exists for one release only.
+- In the **legacy fallback**, insulated tin reports 0.025 EU/block (the 1.7.10 quirk, lower than bare
+  tin). Packet mode uses 1.12.2's 0.2 for tin regardless of insulation; the tooltip follows the active
+  table.
 
 ## API
 
@@ -86,6 +111,7 @@ Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
 - `enableEnetOverload` — the master switch
+- `energy model` — `legacy per-node` or `packet (1.12.2)`; packet mode also prints its round-loss/tier-voltage options
 - `useLinearTransferModel` and the raw `IC2.ini` value — proves the override forced the linear model
 - the `enableEnet*` sub-toggles
 - how many conductors are registered in the current world
@@ -94,6 +120,17 @@ Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 
 This project uses the [GTNewHorizons](https://github.com/GTNewHorizons) 1.7.10 Gradle toolchain. The
 correct JDK is provisioned automatically by Gradle — no manual Java setup required.
+
+### Canary harness (development)
+
+With packet mode enabled, run:
+
+```
+JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
+```
+
+The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It is
+inactive unless the system property is set and is not part of normal gameplay.
 
 ```bash
 git clone https://github.com/MrFuzzihead/IC2Tweaks.git

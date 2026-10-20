@@ -17,6 +17,13 @@ public final class EnetCableData {
      */
     public static final double NO_SHOCK = Integer.MAX_VALUE;
 
+    /**
+     * IC2 Experimental 1.12.2's non-conductor inner loss. It is used for source and sink nodes in the
+     * packet model, which makes a direct machine-to-machine link 0.002 EU (and lossless once the default
+     * {@code roundLossDown} floors path loss).
+     */
+    public static final double NON_CONDUCTOR_INNER_LOSS = 0.002D;
+
     private EnetCableData() {}
 
     /**
@@ -55,6 +62,42 @@ public final class EnetCableData {
                 return 0.025D;
             case 14:
                 return 0.15D;
+            default:
+                return 0D;
+        }
+    }
+
+    /**
+     * IC2 Experimental 1.12.2's cable loss table. In 1.12.2 the loss depends only on the cable type, not
+     * on the insulation level; 1.7.10's per-metadata differences (notably insulated tin) do not exist
+     * there. Vestigial 2x/3x metas map to the same type value.
+     *
+     * @param meta cable item/block metadata
+     * @return the cable's 1.12.2 EU/block loss, or {@code 0} for a non-cable metadata value
+     */
+    public static double conductionLoss1212(int meta) {
+        switch (meta) {
+            case 0:
+            case 1:
+                return 0.2D; // copper
+            case 2:
+            case 3:
+            case 4:
+                return 0.4D; // gold
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+                return 0.8D; // HV / iron
+            case 9:
+                return 0.025D; // glass fibre
+            case 10:
+            case 13:
+            case 14:
+                return 0.2D; // tin
+            case 11:
+            case 12:
+                return 0.5D; // detector / splitter
             default:
                 return 0D;
         }

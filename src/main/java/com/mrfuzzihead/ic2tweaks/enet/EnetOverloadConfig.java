@@ -24,6 +24,22 @@ public final class EnetOverloadConfig {
      */
     public static boolean enabled = true;
 
+    /**
+     * 1.12.2-style packet calculator. On by default since Phase 4; set {@code false} for the legacy
+     * per-node model as a one-release fallback. When on, the packet mixins replace the distribution tick
+     * and the legacy effect passes are not applied.
+     */
+    public static boolean packetModel = true;
+
+    /** Mirrors 1.12.2's {@code misc/roundEnetLoss} (default true): floor each path's accumulated loss. */
+    public static boolean packetModelRoundLossDown = true;
+
+    /**
+     * When on, {@code NodeStats.getVoltage()} reports 1.12.2's raw tier index instead of the rated tier
+     * voltage (32/128/512/...). Rated volts are the default for 1.7.10 UI/addon compatibility.
+     */
+    public static boolean packetModelTierVoltage = false;
+
     /** Explode machines that accept a packet above their tier's voltage. */
     public static boolean explosions = true;
 
@@ -50,8 +66,34 @@ public final class EnetOverloadConfig {
             CATEGORY,
             true,
             "Master switch for the global IC2 energy-net overload system (IC2 Experimental 1.12.2 style). "
-                + "When enabled, this mod forces IC2's misc/useLinearTransferModel to true (ignoring IC2.ini) "
-                + "and applies over-voltage explosions, cable meltdown and shocks to every IC2 machine and cable.");
+                + "When enabled, this mod applies over-voltage explosions, cable meltdown and shocks to every IC2 "
+                + "machine and cable. Without enablePacketModel it forces IC2's misc/useLinearTransferModel to true "
+                + "(ignoring IC2.ini); with enablePacketModel it replaces the distribution with the packet calculator "
+                + "instead.");
+
+        packetModel = configuration.getBoolean(
+            "enablePacketModel",
+            CATEGORY,
+            true,
+            "Use the 1.12.2 packet/path calculator (default). Fault checks (melt/shock/explosion) use each path's "
+                + "own packet instead of per-node aggregates, so multiple sources no longer add up. Set this to false "
+                + "to use the legacy per-node model as a one-release fallback (it also forces IC2's "
+                + "useLinearTransferModel). Requires a restart.");
+
+        packetModelRoundLossDown = configuration.getBoolean(
+            "packetModelRoundLossDown",
+            CATEGORY,
+            true,
+            "Packet model only: floor each energy path's accumulated loss. Default true, matching IC2 "
+                + "1.12.2's misc/roundEnetLoss; set false to keep the fractional 1.7.10 path losses.");
+
+        packetModelTierVoltage = configuration.getBoolean(
+            "packetModelTierVoltage",
+            CATEGORY,
+            false,
+            "Packet model only: report 1.12.2's raw tier index (1, 2, 3, ...) from NodeStats.getVoltage() "
+                + "instead of the rated tier voltage (32, 128, 512, ...). Rated volts are the default for 1.7.10 "
+                + "UI and addon compatibility.");
 
         explosions = configuration.getBoolean(
             "enableEnetExplosions",
@@ -75,9 +117,9 @@ public final class EnetOverloadConfig {
             "enableDemandCappedPackets",
             CATEGORY,
             false,
-            "Cap each injection at the sink's remaining demand (IC2 Experimental 1.12.2 packet sizing). "
-                + "This changes how much energy every machine receives and how much is returned to sources, "
-                + "so it is off by default.");
+            "Legacy model only: cap each injection at the sink's remaining demand. The packet model always "
+                + "does this as part of its distribution. This changes how much energy every machine receives "
+                + "and how much is returned to sources, so it is off by default.");
 
         if (configuration.hasChanged()) {
             configuration.save();

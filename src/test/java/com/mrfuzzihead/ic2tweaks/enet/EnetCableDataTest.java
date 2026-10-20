@@ -31,6 +31,27 @@ class EnetCableDataTest {
     }
 
     @Test
+    void conductionLoss1212IsTypeBasedAndInsulationIndependent() {
+        assertEquals(0.2D, EnetCableData.conductionLoss1212(0)); // insulated copper
+        assertEquals(0.2D, EnetCableData.conductionLoss1212(1)); // copper
+        assertEquals(0.4D, EnetCableData.conductionLoss1212(2)); // gold
+        assertEquals(0.4D, EnetCableData.conductionLoss1212(3)); // insulated gold
+        assertEquals(0.4D, EnetCableData.conductionLoss1212(4)); // vestigial 2x gold
+        assertEquals(0.8D, EnetCableData.conductionLoss1212(5)); // HV
+        assertEquals(0.8D, EnetCableData.conductionLoss1212(6)); // insulated HV
+        assertEquals(0.8D, EnetCableData.conductionLoss1212(7)); // vestigial 2x HV
+        assertEquals(0.8D, EnetCableData.conductionLoss1212(8)); // vestigial 3x HV
+        assertEquals(0.025D, EnetCableData.conductionLoss1212(9)); // glass fibre
+        assertEquals(0.2D, EnetCableData.conductionLoss1212(10)); // tin
+        assertEquals(0.5D, EnetCableData.conductionLoss1212(11)); // detector
+        assertEquals(0.5D, EnetCableData.conductionLoss1212(12)); // splitter
+        // 1.12.2 tin is 0.2 regardless of insulation; the 1.7.10 0.025 quirk is legacy-only.
+        assertEquals(0.2D, EnetCableData.conductionLoss1212(13)); // insulated tin
+        assertEquals(0.2D, EnetCableData.conductionLoss1212(14)); // legacy insulated tin
+        assertEquals(0.002D, EnetCableData.NON_CONDUCTOR_INNER_LOSS);
+    }
+
+    @Test
     void nonCableMetadataHasNoLoss() {
         assertEquals(0D, EnetCableData.conductionLoss(-1));
         assertEquals(0D, EnetCableData.conductionLoss(15));
