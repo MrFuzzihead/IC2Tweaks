@@ -792,7 +792,9 @@ Behavior notes for validation:
   path); client-side stats remain zero, as before. It is also **per current tick** (1.12.2 semantics): a
   node with no packet on that tick reports zero. The legacy model persisted the last solved voltage, so an
   idle machine/storage block that reads a voltage in legacy mode will read 0 in packet mode once its buffer
-  is full. Measure while the machine is actively consuming or immediately after placing it.
+  is full. Because the packet is demand-capped, a nearly full sink receives only its remaining demand;
+  the reported tier can be 0 even while a small amount flows. Measure while the machine is actively
+  consuming or immediately after placing it.
 * EnergyControl is the only pack mod that modifies cabling/storage internals (see §11.6); its storage
   display is the first in-game canary.
 * The 1.7.10 loss constants still come from the live graph; §10.1 remains pending.
