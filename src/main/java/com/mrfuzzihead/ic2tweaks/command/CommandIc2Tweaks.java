@@ -9,11 +9,13 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.mrfuzzihead.ic2tweaks.Tags;
+import com.mrfuzzihead.ic2tweaks.WrenchConfig;
 import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 
 import ic2.core.energy.EnergyNetLocal;
 import ic2.core.init.MainConfig;
+import ic2.core.item.tool.ItemToolWrench;
 import ic2.core.util.ConfigUtil;
 
 /**
@@ -54,9 +56,26 @@ public class CommandIc2Tweaks extends CommandBase {
         boolean rawLinear = ConfigUtil.getBool(MainConfig.get(), "misc/useLinearTransferModel");
         boolean linear = EnergyNetLocal.useLinearTransferModel;
         boolean mixinApplied = hasIc2TweaksMember(EnergyNetLocal.class);
+        boolean wrenchMixinApplied = hasIc2TweaksMember(ItemToolWrench.class);
 
         send(sender, EnumChatFormatting.GOLD + "IC2Tweaks " + Tags.VERSION);
         send(sender, "mixin active: " + colour(mixinApplied) + mixinApplied);
+        send(
+            sender,
+            "wrench mixin active: " + colour(wrenchMixinApplied)
+                + wrenchMixinApplied
+                + EnumChatFormatting.GRAY
+                + " (losslessWrench="
+                + WrenchConfig.lossless
+                + ")");
+        if (WrenchConfig.lossless) {
+            send(
+                sender,
+                "lossless wrench cost: " + WrenchConfig.manualDurabilityCost
+                    + " durability / "
+                    + WrenchConfig.electricEnergyCost
+                    + " EU");
+        }
         send(sender, "enableEnetOverload: " + colour(EnetOverloadConfig.enabled) + EnetOverloadConfig.enabled);
         send(
             sender,

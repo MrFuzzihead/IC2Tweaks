@@ -21,6 +21,12 @@ that changes to IC2 itself can be shipped and versioned independently.
   copper/gold/HV 32 EU/t), while insulated cables are shock-safe unless they actually overload and melt.
   TEs can opt out of or resize an over-voltage blast via `com.mrfuzzihead.ic2tweaks.api.IOverloadHandler`
   / `IExplosionPowerOverride`.
+- **Lossless wrenching** (on by default): machines removed with a wrench always drop themselves instead of
+  breaking into a machine casing. IC2 only has a per-item NBT toggle on the electric wrench
+  (`losslessMode`) and per-machine drop rates (0.7–0.9 for most IC2 machines); this config makes every
+  wrench use IC2's lossless path. The cost is balanced: normal wrenches pay 40 durability (4× the normal
+  10) and electric wrenches pay 10,000 EU (IC2's native lossless cost, 200 damage × 50 EU).
+  Blocks that already drop 100% of the time keep the normal 10-damage cost.
 
 ## Requirements
 
@@ -33,7 +39,15 @@ that changes to IC2 itself can be shipped and versioned independently.
 
 ## Configuration
 
-`config/ic2tweaks.cfg`, `energynet` category (global — applies to all IC2 machines and cables):
+`config/ic2tweaks.cfg`, `wrench` category:
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `losslessWrench` | `true` | Every wrench uses IC2's lossless path for machines whose drop rate is below 100%, so wrenched machines always drop themselves instead of a casing. Blocks already at 100% keep their normal cost. Requires a restart |
+| `losslessWrenchDurabilityCost` | `20` | Durability charged per forced-lossless operation with a normal wrench (IC2's normal wrench cost is 10) |
+| `losslessWrenchEnergyCost` | `5000` | EU charged per forced-lossless operation with an electric wrench. Half of IC2's native lossless cost; rounded up to the next 50 EU. Set `0` for free lossless wrenching |
+
+`energynet` category (global — applies to all IC2 machines and cables):
 
 | Option | Default | Description |
 | ------ | ------- | ----------- |
@@ -110,6 +124,7 @@ Both mirror IC2 Experimental 1.12.2's interfaces of the same name.
 Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
+- `wrench mixin active` — whether the wrench drop-rate mixin was applied, plus the `losslessWrench` value and its durability/EU costs
 - `enableEnetOverload` — the master switch
 - `energy model` — `legacy per-node` or `packet (1.12.2)`; packet mode also prints its round-loss/tier-voltage options
 - `useLinearTransferModel` and the raw `IC2.ini` value — proves the override forced the linear model
