@@ -4,16 +4,24 @@ import javax.annotation.Nonnull;
 
 import com.gtnewhorizon.gtnhmixins.builders.IMixins;
 import com.gtnewhorizon.gtnhmixins.builders.MixinBuilder;
+import com.mrfuzzihead.ic2tweaks.WrenchConfig;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 
 /**
- * Mixin registry for the global IC2 energy-net overload feature.
+ * Mixin registry for the IC2 core tweaks.
  * <p>
- * Every entry is gated by the master {@code enableEnetOverload} config option, so when the feature is
- * off IC2 behaves exactly as before (including honoring its own {@code misc/useLinearTransferModel}
- * setting).
+ * The energy-net entries are gated by the master {@code enableEnetOverload} config option, so when that
+ * feature is off IC2 behaves exactly as before (including honoring its own
+ * {@code misc/useLinearTransferModel} setting). The wrench tweak is gated independently by
+ * {@code wrench/losslessWrench}.
  */
 public enum Mixins implements IMixins {
+
+    /** Treats every machine's wrench drop rate as 100%, so wrenched machines never break. */
+    WRENCH_LOSSLESS(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemToolWrench")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> WrenchConfig.lossless)),
 
     /** Forces {@code EnergyNetLocal.useLinearTransferModel} to true, ignoring IC2.ini (legacy mode only). */
     ENET_LINEAR_MODEL(new MixinBuilder().setPhase(Phase.LATE)

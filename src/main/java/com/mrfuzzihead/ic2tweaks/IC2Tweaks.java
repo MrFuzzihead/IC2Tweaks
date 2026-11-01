@@ -34,10 +34,18 @@ public class IC2Tweaks {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        // Ensure the energy-net options exist in ic2tweaks.cfg even if the late mixin loader did not
-        // read the file first (it usually does).
+        // Ensure the options exist in ic2tweaks.cfg even if the late mixin loader did not read the
+        // file first (it usually does).
         EnetOverloadConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        WrenchConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         LOG.info("Energy-net model: {}", EnetOverloadConfig.packetModel ? "packet (1.12.2-style)" : "legacy per-node");
+        LOG.info("Lossless wrenching: {}", WrenchConfig.lossless);
+        if (WrenchConfig.lossless) {
+            LOG.info(
+                "Lossless wrench cost: {} durability / {} EU",
+                WrenchConfig.manualDurabilityCost,
+                WrenchConfig.electricEnergyCost);
+        }
 
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the
         // registry keeps track of the conductors IC2 has loaded.
