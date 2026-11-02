@@ -154,13 +154,19 @@ public final class JetpackConfig {
     // Slot integration
     // ---------------------------------------------------------------------------------------------
 
+    /** Default Baubles slot types. {@code cape}/{@code wings}/{@code body} need Baubles-Expanded. */
+    private static final String DEFAULT_BAUBLE_SLOT_TYPES = "cape,wings,body,belt";
+
+    /** The pre-wings default; migrated in {@link #synchronizeConfiguration(File)}. */
+    private static final String LEGACY_BAUBLE_SLOT_TYPES = "cape,body,belt";
+
     /**
-     * Baubles slot types the jetpack is allowed in, as a comma-separated list. "cape" and "body" require
-     * Baubles-Expanded (and an assigned slot of that type); "belt" works with original Baubles. The item
-     * reports all listed types, so it fits whichever of those slots the pack actually has. Use OFF to
+     * Baubles slot types the jetpack is allowed in, as a comma-separated list. "cape", "wings" and "body"
+     * require Baubles-Expanded (and an assigned slot of that type); "belt" works with original Baubles. The
+     * item reports all listed types, so it fits whichever of those slots the pack actually has. Use OFF to
      * disable the Baubles integration. Requires a restart.
      */
-    public static String[] baubleSlotTypes = { "cape", "body", "belt" };
+    public static String[] baubleSlotTypes = { "cape", "wings", "body", "belt" };
 
     /** TravellersGear slot the jetpack is allowed in. Requires a restart. */
     public static TravellersGearSlot travellersGearSlot = TravellersGearSlot.CLOAK;
@@ -439,15 +445,21 @@ public final class JetpackConfig {
                 + "vanilla HUD display 8 armour points. When true, the HUD uses the Forge ISpecialArmor "
                 + "display value instead (0 for the jetpack). Requires a restart.");
 
-        baubleSlotTypes = parseSlotTypes(
-            configuration.getString(
-                "baubleSlotTypes",
-                CATEGORY,
-                "cape,body,belt",
-                "Comma-separated Baubles slot types the jetpack is allowed in. \"cape\" and \"body\" require "
-                    + "Baubles-Expanded (and an assigned slot of that type); \"belt\" works with original "
-                    + "Baubles. The item reports all listed types, so it fits whichever slot the pack has. "
-                    + "Use OFF to disable the Baubles integration. Requires a restart."));
+        String rawBaubleSlotTypes = configuration.getString(
+            "baubleSlotTypes",
+            CATEGORY,
+            DEFAULT_BAUBLE_SLOT_TYPES,
+            "Comma-separated Baubles slot types the jetpack is allowed in. \"cape\", \"wings\" and \"body\" "
+                + "require Baubles-Expanded (and an assigned slot of that type); \"belt\" works with original "
+                + "Baubles. The item reports all listed types, so it fits whichever slot the pack has. "
+                + "Use OFF to disable the Baubles integration. The old default (cape,body,belt) is upgraded "
+                + "to include wings. Requires a restart.");
+        if (LEGACY_BAUBLE_SLOT_TYPES.equalsIgnoreCase(rawBaubleSlotTypes.trim())) {
+            rawBaubleSlotTypes = DEFAULT_BAUBLE_SLOT_TYPES;
+            configuration.get(CATEGORY, "baubleSlotTypes", DEFAULT_BAUBLE_SLOT_TYPES)
+                .set(rawBaubleSlotTypes);
+        }
+        baubleSlotTypes = parseSlotTypes(rawBaubleSlotTypes);
 
         travellersGearSlot = TravellersGearSlot.fromString(
             configuration.getString(

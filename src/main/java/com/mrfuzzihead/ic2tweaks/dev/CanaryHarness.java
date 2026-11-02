@@ -453,6 +453,21 @@ public final class CanaryHarness {
                 hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleMixinApplied")
                     || hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied"),
                 "Baubles");
+            if (jetpackStack != null
+                && hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied")) {
+                try {
+                    String[] types = (String[]) ItemArmorJetpack.class.getMethod("getBaubleTypes", ItemStack.class)
+                        .invoke(jetpackStack.getItem(), jetpackStack);
+                    check(
+                        "jetpack exposes the wings bauble type",
+                        java.util.Arrays.asList(types)
+                            .contains("wings"),
+                        java.util.Arrays.toString(types));
+                } catch (Exception e) {
+                    failures.add("jetpack bauble types: " + e);
+                    IC2Tweaks.LOG.error("[canary] bauble types probe failed", e);
+                }
+            }
         }
         if (Loader.isModLoaded("TravellersGear")) {
             check(

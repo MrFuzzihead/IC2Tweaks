@@ -73,7 +73,7 @@ public enum Mixins implements IMixins {
         .addRequiredMod(TargetMods.BAUBLES)
         .setApplyIf(() -> JetpackConfig.isBaubleSlotEnabled() && !hasBaublesExpanded())),
 
-    /** Baubles-Expanded: reports the configured cape/body/belt slot types. */
+    /** Baubles-Expanded: reports the configured cape/wings/body/belt slot types. */
     JETPACK_BAUBLE_EXPANDED(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinItemArmorJetpackBaubleExpanded")
         .addRequiredMod(TargetMods.IC2)

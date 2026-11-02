@@ -90,7 +90,7 @@ class JetpackConfigTest {
         assertFalse(JetpackConfig.fallProtection);
         assertTrue(JetpackConfig.stripJetpackArmorDisplay);
 
-        assertArrayEquals(new String[] { "cape", "body", "belt" }, JetpackConfig.baubleSlotTypes);
+        assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
         assertEquals(TravellersGearSlot.CLOAK, JetpackConfig.travellersGearSlot);
         assertEquals(1.0F, JetpackConfig.slotFuelMultiplier, 1.0E-6F);
         assertTrue(JetpackConfig.renderWornJetpack);
@@ -98,9 +98,10 @@ class JetpackConfigTest {
 
         assertTrue(JetpackConfig.isBaubleSlotEnabled());
         assertTrue(JetpackConfig.hasBaubleSlotType("CAPE"));
+        assertTrue(JetpackConfig.hasBaubleSlotType("WINGS"));
         assertFalse(JetpackConfig.hasBaubleSlotType("ring"));
         assertFalse(JetpackConfig.hasBaubleSlotType(null));
-        assertEquals("cape,body,belt", JetpackConfig.baubleSlotTypesCsv());
+        assertEquals("cape,wings,body,belt", JetpackConfig.baubleSlotTypesCsv());
     }
 
     @Test
@@ -116,7 +117,7 @@ class JetpackConfigTest {
             .set("3");
         configuration.get(JetpackConfig.CATEGORY, "electricPowerFactor", "0.7")
             .set("1.0");
-        configuration.get(JetpackConfig.CATEGORY, "baubleSlotTypes", "cape,body,belt")
+        configuration.get(JetpackConfig.CATEGORY, "baubleSlotTypes", "cape,wings,body,belt")
             .set("OFF");
         configuration.get(JetpackConfig.CATEGORY, "travellersGearSlot", "CLOAK")
             .set("SHOULDERS");
@@ -162,6 +163,14 @@ class JetpackConfigTest {
         JetpackConfig.synchronizeConfiguration(currentFile);
         assertArrayEquals(new String[] { "wings" }, JetpackConfig.baubleSlotTypes);
         assertTrue(JetpackConfig.hasBaubleSlotType("WINGS"));
+    }
+
+    @Test
+    void oldSlotDefaultIsMigratedToIncludeWings() {
+        setString("baubleSlotTypes", "cape,body,belt");
+        JetpackConfig.synchronizeConfiguration(currentFile);
+        assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
+        assertEquals("cape,wings,body,belt", JetpackConfig.baubleSlotTypesCsv());
     }
 
     @Test

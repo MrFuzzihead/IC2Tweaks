@@ -15,7 +15,7 @@ notes on the quantum suit's integrated jetpack and GraviSuite's Advanced JetPack
 
 1. **Horizontal flight** - the biggest UX win, and the cheapest root-cause fix (the jetpack's own
    horizontal impulse is only 0.0024-0.016 blocks/tick; vanilla air control alone is 0.02).
-2. **Wearable with armor** (TravellersGear cloak slot first, Baubles-Expanded cape/body/belt second) - very doable, but
+2. **Wearable with armor** (TravellersGear cloak slot first, Baubles-Expanded cape/wings/body/belt second) - very doable, but
    it needs a worn-stack resolver, a single owner for the tick, and a renderer. IC2 hard-codes
    `player.inventory.armorInventory[2]` and only ticks the chest slot.
 3. **Bug fixes** - ground sound, fuel-boundary free thrust, static audio leak, creative/riding/water
@@ -158,7 +158,7 @@ model, and a speed cap.
 
 1. **One worn-stack resolver** (`JetpackWorn`):
    - chest slot first (stock behaviour; preserves current feel),
-   - then a Baubles/Expanded slot matching the configured `baubleSlotTypes` (default `cape,body,belt`),
+   - then a Baubles/Expanded slot matching the configured `baubleSlotTypes` (default `cape,wings,body,belt`),
    - then the TravellersGear cloak/shoulders slot (config `travellersGearSlot`).
    - Return exactly one stack per player per tick; never tick two jetpacks at once.
 2. **One tick owner**: a `TickEvent.PlayerTickEvent` handler (FML bus) that resolves the stack and runs
@@ -396,7 +396,7 @@ B1-B4, B6-B9, B11, B16, B22; the entries below remain as the technical record.
 
 | # | Feature | Why |
 | --- | --- | --- |
-| F1 | TravellersGear cloak slot + Baubles-Expanded cape/body/belt slot, with rendering | The two requested integrations; frees the chest slot. |
+| F1 | TravellersGear cloak slot + Baubles-Expanded cape/wings/body/belt slot, with rendering | The two requested integrations; frees the chest slot. |
 | F2 | Full 8-direction horizontal flight + boost key (afterburner) | The other requested change; IC2's boost key is already synced and unused by the jetpack. GraviSuite's boost is a good precedent. |
 | F3 | Hover improvements: true altitude hold, configurable rise/sink, optional sneak-descend in normal mode | Makes hover usable for building; fixes the "can't get down" feel. |
 | F4 | HUD (fuel %, mode, speed, altitude) + control tooltips + localized messages | The durability bar is coarse (27 states) and the controls are undiscoverable. |
@@ -440,7 +440,7 @@ gasLowFuelThreshold, electricLowFuelThreshold
 altitudeFadeBlocks, electricAltitudeFactor
 allowInWater, allowInLava, creativeNoDrain, fallProtection,
 stripJetpackArmorDisplay
-baubleSlotTypes (cape,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
+baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
 slotFuelMultiplier, renderWornJetpack, syncIntervalTicks
 ```
 
@@ -451,8 +451,9 @@ Notes on the Phase 0 defaults:
 - `electricHoverFactor=0.5` and `electricPowerFactor=0.7` keep IC2's stock electric hover speed (0.1
   instead of 0.2) and normal lift/horizontal multiplier (0.7). Set `electricPowerFactor=1.0` for gas
   parity.
-- `baubleSlotTypes` defaults to `cape,body,belt`: the pack has a `cape` slot (best fit), `body` is
-  accepted if a pack assigns it, and `belt` keeps original-Baubles compatibility.
+- `baubleSlotTypes` defaults to `cape,wings,body,belt`: the pack has `cape` and `wings` slots, `body` is
+  accepted if a pack assigns it, and `belt` keeps original-Baubles compatibility. The old
+  `cape,body,belt` default is migrated to include wings.
 - `syncIntervalTicks=0` means no extra sync; both sides simulate, matching IC2/Hodgepodge.
 - `stripJetpackArmorDisplay=true` is the fix for B22 (the misleading 8 HUD armour points). It is an
   early mixin on `EntityPlayer` (see Phase 1), because vanilla `EntityPlayer` is loaded before the late
@@ -493,8 +494,9 @@ mods.
 - Baubles mixins:
   - `MixinItemArmorJetpackBauble` (legacy `IBauble`, `BaubleType.BELT`) applies when the expanded API is
     absent.
-  - `MixinItemArmorJetpackBaubleExpanded` (`IBaubleExpanded.getBaubleTypes` = `baubleSlotTypes`) applies
-    when `baubles.api.expanded.IBaubleExpanded` is present. The two are mutually exclusive.
+  - `MixinItemArmorJetpackBaubleExpanded` (`IBaubleExpanded.getBaubleTypes` = `baubleSlotTypes`, default
+    `cape,wings,body,belt`) applies when `baubles.api.expanded.IBaubleExpanded` is present. The two are
+    mutually exclusive.
 - `MixinItemArmorJetpackTravellersGear` (`ITravellersGear.getSlot` = `travellersGearSlot.index`) applies
   only when TravellersGear is loaded and the slot is not `OFF`.
 - `JetpackWorn` now has common `SlotProvider` hooks; `IC2Tweaks.preInit` registers `BaublesCompat` /
@@ -621,7 +623,7 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
    gated by `enableJetpackTweaks`; a runtime disable falls back to the stock body.
 2. **Slot priority** when several jetpack sources are worn: **resolved** - chest wins, then Baubles, then
    TravellersGear; exactly one stack is ticked.
-3. **Baubles slot type list**: **resolved** - default `cape,body,belt`; legacy original Baubles falls back
+3. **Baubles slot type list**: **resolved** - default `cape,wings,body,belt`; legacy original Baubles falls back
    to the belt slot because the 1.7.10 `BaubleType` copies do not reliably expose `UNIVERSAL`.
 4. **TG slot**: **resolved** - default CLOAK (back), configurable to SHOULDERS/OFF.
 5. **Balance**: keep the gas/electric asymmetry or bring the electric jetpack up to gas endurance/lift?
