@@ -12,8 +12,10 @@ import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
@@ -65,6 +67,28 @@ public class IC2Tweaks {
                 "Lossless wrench cost: {} durability / {} EU",
                 WrenchConfig.manualDurabilityCost,
                 WrenchConfig.electricEnergyCost);
+        }
+
+        // Optional slot integrations. The compat classes reference the optional mods' APIs, so only load
+        // them when the mod is present; JetpackWorn itself stays free of those types.
+        if (Loader.isModLoaded("Baubles")) {
+            JetpackWorn.registerBaubles(new com.mrfuzzihead.ic2tweaks.jetpack.compat.BaublesCompat());
+        }
+        if (Loader.isModLoaded("TravellersGear")) {
+            JetpackWorn.registerTravellersGear(new com.mrfuzzihead.ic2tweaks.jetpack.compat.TravellersGearCompat());
+        }
+        if (FMLCommonHandler.instance()
+            .getSide()
+            .isClient()) {
+            // Reflection keeps client-only classes out of the server class-loading path.
+            try {
+                Object renderer = Class.forName("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackRenderer")
+                    .getConstructor()
+                    .newInstance();
+                MinecraftForge.EVENT_BUS.register(renderer);
+            } catch (ReflectiveOperationException e) {
+                LOG.warn("Could not register the jetpack renderer", e);
+            }
         }
 
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the

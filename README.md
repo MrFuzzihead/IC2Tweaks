@@ -27,11 +27,12 @@ that changes to IC2 itself can be shipped and versioned independently.
   wrench use IC2's lossless path. The cost is balanced: normal wrenches pay 40 durability (4× the normal
   10) and electric wrenches pay 10,000 EU (IC2's native lossless cost, 200 damage × 50 EU).
   Blocks that already drop 100% of the time keep the normal 10-damage cost.
-- **Jetpack improvements (Phase 1)**: IC2's stock jetpack tick is replaced by a configurable flight
+- **Jetpack improvements (Phase 2)**: IC2's stock jetpack tick is replaced by a configurable flight
   controller: full 8-direction horizontal flight with acceleration/braking and the IC2 boost key,
   configurable hover/ascent, drain-before-thrust, guards for riding/creative flight/water/lava, a
   per-player hover state that no longer depends on the old NBT sync, and a HUD fix that hides the
-  jetpack's fake 8 armour points. The Baubles-Expanded/TravellersGear slot integration is Phase 2. See
+  jetpack's fake 8 armour points. Stock jetpacks can also be worn in Baubles-Expanded `cape`/`body`/`belt`
+  slots or the TravellersGear cloak/shoulder slot, with a rendered backpack; see
   `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
@@ -98,6 +99,8 @@ currently treated as storage (energy/tier/output) rather than a machine (buffer/
 | Minecraft Forge | 10.13.4.1614 | [Download](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.7.10.html) |
 | [IndustrialCraft²](https://www.curseforge.com/minecraft/mc-mods/industrial-craft) | 2.2.828-experimental | Required at runtime |
 | [UniMixins](https://github.com/GTNewHorizons/UniMixins) | any GTNH build | Required at runtime; pulled in automatically as a dependency |
+| [Baubles-Expanded](https://github.com/GTNewHorizons/Baubles-Expanded) | 2.2.27-GTNH | Optional: jetpack in a `cape`/`body`/`belt` slot |
+| [TravellersGear](https://www.curseforge.com/minecraft/mc-mods/travellers-gear) | 1.16.x | Optional: jetpack in the cloak/shoulder slot |
 
 ## Configuration
 
@@ -169,8 +172,8 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   tin). Packet mode uses 1.12.2's 0.2 for tin regardless of insulation; the tooltip follows the active
   table.
 
-`jetpack` category (Phase 1: the flight tick is active; the Baubles/TravellersGear slot options take
-effect in Phase 2):
+`jetpack` category (Phase 2: the flight tick and the optional Baubles-Expanded/TravellersGear slots are
+active):
 
 | Option | Default | Description |
 | ------ | ------- | ----------- |
@@ -186,7 +189,7 @@ effect in Phase 2):
 | `gasFuelPerTick` / `gasHoverFuelPerTick` | `2` / `1` | Biogas mB/tick in normal/hover mode |
 | `electricEuPerTick` / `electricHoverEuPerTick` | `8` / `7` | EU/tick in normal/hover mode |
 | `altitudeFadeBlocks` / `electricAltitudeFactor` | `25` / `1.28` | Altitude fade length and electric ceiling divisor |
-| `baubleSlotTypes` | `cape,body,belt` | Comma-separated Baubles slot types; `OFF` disables. Requires a restart |
+| `baubleSlotTypes` | `cape,body,belt` | Comma-separated Baubles slot types (cape/body require Baubles-Expanded; belt works with original Baubles); `OFF` disables. Requires a restart |
 | `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
 | `slotFuelMultiplier` | `1.0` | Extra fuel multiplier while worn in a bauble/TG slot |
 | `allowInWater` / `allowInLava` | `false` | Allow thrust in water/lava |
@@ -236,8 +239,9 @@ JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
 
 The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It also
 checks the pure jetpack physics, the jetpack/HUD mixin markers, and ticks a real `EntityPlayer` with a
-filled gas jetpack in hover mode to verify the handler drains fuel and resets fall distance. It is
-inactive unless the system property is set and is not part of normal gameplay.
+filled gas jetpack in hover mode to verify the handler drains fuel and resets fall distance, and (when
+Baubles is loaded) places a jetpack in a Baubles slot to verify the resolver. It is inactive unless the
+system property is set and is not part of normal gameplay.
 
 ```bash
 git clone https://github.com/MrFuzzihead/IC2Tweaks.git

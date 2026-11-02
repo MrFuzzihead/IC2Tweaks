@@ -10,7 +10,9 @@ import com.gtnewhorizon.gtnhmixins.builders.TargetModBuilder;
  */
 public enum TargetMods implements ITargetMod {
 
-    IC2("IC2");
+    IC2("IC2"),
+    BAUBLES("Baubles"),
+    TRAVELLERS_GEAR("TravellersGear");
 
     private final TargetModBuilder builder;
 

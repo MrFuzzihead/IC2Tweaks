@@ -122,8 +122,11 @@ public class CommandIc2Tweaks extends CommandBase {
 
     private void reportJetpack(ICommandSender sender) {
         send(sender, EnumChatFormatting.GOLD + "IC2Tweaks " + Tags.VERSION + " - jetpack");
-        boolean tickMixin = hasIc2TweaksMember(ItemArmorJetpack.class);
-        boolean hudMixin = hasIc2TweaksMember(EntityPlayer.class);
+        boolean tickMixin = hasMethod(ItemArmorJetpack.class, "ic2tweaks$jetpackTickReplaced");
+        boolean hudMixin = hasMethod(EntityPlayer.class, "ic2tweaks$armorHudMixinApplied");
+        boolean baubleMixin = hasMethod(ItemArmorJetpack.class, "ic2tweaks$baubleMixinApplied")
+            || hasMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied");
+        boolean travellersGearMixin = hasMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied");
         send(
             sender,
             "tick mixin: " + colour(tickMixin) + tickMixin + EnumChatFormatting.GRAY + " (stock onArmorTick replaced)");
@@ -134,6 +137,22 @@ public class CommandIc2Tweaks extends CommandBase {
                 + EnumChatFormatting.GRAY
                 + " (ISpecialArmor display="
                 + JetpackConfig.stripJetpackArmorDisplay
+                + ")");
+        send(
+            sender,
+            "baubles mixin: " + colour(baubleMixin)
+                + baubleMixin
+                + EnumChatFormatting.GRAY
+                + " (slots "
+                + JetpackConfig.baubleSlotTypesCsv()
+                + ")");
+        send(
+            sender,
+            "travellersgear mixin: " + colour(travellersGearMixin)
+                + travellersGearMixin
+                + EnumChatFormatting.GRAY
+                + " (slot "
+                + JetpackConfig.travellersGearSlot
                 + ")");
         send(
             sender,
@@ -215,6 +234,15 @@ public class CommandIc2Tweaks extends CommandBase {
         }
         return registry.getConductors(world)
             .size();
+    }
+
+    private static boolean hasMethod(Class<?> clazz, String name) {
+        try {
+            clazz.getDeclaredMethod(name);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     private static boolean hasIc2TweaksMember(Class<?> clazz) {

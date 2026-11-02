@@ -66,6 +66,27 @@ public enum Mixins implements IMixins {
         .addRequiredMod(TargetMods.IC2)
         .setApplyIf(() -> JetpackConfig.enabled)),
 
+    /** Original Baubles (no expanded API): makes the jetpack a belt/universal bauble. */
+    JETPACK_BAUBLE_LEGACY(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemArmorJetpackBauble")
+        .addRequiredMod(TargetMods.IC2)
+        .addRequiredMod(TargetMods.BAUBLES)
+        .setApplyIf(() -> JetpackConfig.isBaubleSlotEnabled() && !hasBaublesExpanded())),
+
+    /** Baubles-Expanded: reports the configured cape/body/belt slot types. */
+    JETPACK_BAUBLE_EXPANDED(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemArmorJetpackBaubleExpanded")
+        .addRequiredMod(TargetMods.IC2)
+        .addRequiredMod(TargetMods.BAUBLES)
+        .setApplyIf(() -> JetpackConfig.isBaubleSlotEnabled() && hasBaublesExpanded())),
+
+    /** TravellersGear cloak/shoulder slot. */
+    JETPACK_TRAVELLERS_GEAR(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemArmorJetpackTravellersGear")
+        .addRequiredMod(TargetMods.IC2)
+        .addRequiredMod(TargetMods.TRAVELLERS_GEAR)
+        .setApplyIf(() -> JetpackConfig.travellersGearSlot != JetpackConfig.TravellersGearSlot.OFF)),
+
     /** Makes the vanilla armour bar honour ISpecialArmor.getArmorDisplay (hides the jetpack's fake 8 points). */
     JETPACK_ARMOR_HUD(new MixinBuilder().setPhase(Phase.EARLY)
         .addCommonMixins("minecraft.MixinEntityPlayerArmorValue"));
@@ -80,5 +101,15 @@ public enum Mixins implements IMixins {
     @Override
     public MixinBuilder getBuilder() {
         return builder;
+    }
+
+    /** The expanded API class exists only in Baubles-Expanded, not in original Baubles. */
+    private static boolean hasBaublesExpanded() {
+        try {
+            Class.forName("baubles.api.expanded.IBaubleExpanded", false, Mixins.class.getClassLoader());
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }

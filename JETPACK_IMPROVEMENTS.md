@@ -1,8 +1,8 @@
 # IC2 Jetpack Improvement Plan
 
-Status: Phase 0 (config + pure physics) and Phase 1 (stock tick replacement, horizontal flight, bug
-fixes, armor HUD fix) implemented. Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) is next.
-Analysis based on decompiled IC2 2.2.828-experimental
+Status: Phase 0 (config + pure physics), Phase 1 (stock tick replacement, horizontal flight, bug fixes,
+armor HUD fix) and Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) implemented. Phase 3
+(HUD/tooltips/particles/quantum suit) is next. Analysis based on decompiled IC2 2.2.828-experimental
 (`ItemArmorJetpack`, `ItemArmorJetpackElectric`, `ItemArmorFluidTank`, `ItemArmorQuantumSuit`), the
 1.7.10 movement code, the Baubles/TravellersGear 1.7.10 APIs, Hodgepodge 2.7.222 and GraviSuite 2.0.3.
 
@@ -133,9 +133,10 @@ model, and a speed cap.
   via `getBaubleTypes`, so it fits whichever slot the pack actually has. `belt` alone is the most
   portable but conflicts with belts; `cape` is the least intrusive in this pack.
 - `IBaubleExpanded` extends `IBauble`, so implement both: `getBaubleTypes` for expanded slots and
-  `getBaubleType` (BELT, or UNIVERSAL if the list has no belt) for original Baubles. Two gated mixins are
-  needed: the legacy `IBauble` one works everywhere; the `IBaubleExpanded` one must only apply when the
-  expanded API class is present.
+  `getBaubleType` for original Baubles. Two **mutually exclusive** gated mixins are used: the legacy
+  `IBauble` one when the expanded API class is absent, the `IBaubleExpanded` one (with all legacy methods)
+  when it is present. The legacy fallback returns `BaubleType.BELT`; the 1.7.10 `BaubleType` copies do not
+  reliably expose `UNIVERSAL`, and belt is the safe common slot.
 - Baubles-Expanded 2.2.27 ticks `onWornTick` from `LivingEvent.LivingUpdateEvent` (vanilla Forge 1.7.10,
   both sides). Only `setInventorySlotContents` triggers a slot sync packet, so **NBT-only changes
   (fuel/energy/mode) are not synced while worn**.
@@ -169,9 +170,9 @@ model, and a speed cap.
 3. **Equip the same item in the new slots** with gated mixins:
    - `MixinItemArmorJetpackBauble` (`@Mixin(ItemArmorJetpack.class)` + `implements IBauble`), applied only
      when Baubles is loaded and `jetpack.baubleSlotTypes` is not `OFF`.
-   - `MixinItemArmorJetpackBaubleExpanded` (`implements IBaubleExpanded`, adds `getBaubleTypes`), applied
-     only when the Baubles-Expanded API class is present; it adds the interface on top of the legacy mixin
-     and does not duplicate the `IBauble` methods.
+   - `MixinItemArmorJetpackBaubleExpanded` (`implements IBaubleExpanded`, adds `getBaubleTypes` and the
+     legacy methods), applied only when the Baubles-Expanded API class is present. It is mutually
+     exclusive with the legacy mixin, so there are no duplicate `IBauble` methods.
    - `MixinItemArmorJetpackTravellersGear` (`implements ITravellersGear`), applied only when
      TravellersGear is loaded and `jetpack.travellersGearSlot != OFF`.
    - Both Baubles mixins target the gas class; the electric class inherits `instanceof`, so one mixin
@@ -181,11 +182,12 @@ model, and a speed cap.
 4. **Do not rely on the other mod's tick**: use our `PlayerTickEvent` for both Baubles and TG. This gives
    us consistent ordering and avoids double ticking (Baubles 2.2.27 uses `LivingEvent.LivingUpdateEvent`,
    which is fine but not something we need to depend on).
-5. **Rendering**: a `RenderPlayerEvent.Specials.Pre` handler (client-only) that resolves the worn stack;
+5. **Rendering**: a `RenderPlayerEvent.Specials.Post` handler (client-only) that resolves the worn stack;
    if it is not in the chest slot, bind a texture and draw a small `ModelBiped`/model on the back. Return
    immediately for the chest slot (vanilla armour rendering already shows it), so there is no double
    render. If TG is installed, TG's renderer skips the item because `getArmorModel` returns null - our
-   renderer is the only one.
+   renderer is the only one. The implemented MVP is the offset torso described below; Phase 3 can add a
+   dedicated tank/nozzle model.
    - Zero-art MVP: a `ModelBiped` with only `bipedBody` visible, `offsetZ` +1.5 model units (behind the
      torso) and the existing `ic2:textures/armor/jetpack_1.png`. The chestplate in front stays visible;
      the jetpack reads as a backpack. (The texture is a full torso texture, so its front face will be
@@ -482,18 +484,34 @@ Status: done. `enableJetpackTweaks=true` now replaces the stock tick for the two
 Phase 1 fixes: B1, B2, B3, B4, B6, B7, B8, B9 (configurable), B11, B16, B22. Deferred: B5 (addon creative
 items only), B10 (tooltips/fluid name; the hover messages are localized), B12-B15, B19-B21.
 
-### Phase 2 - Slots + rendering
+### Phase 2 - Slots + rendering (implemented)
 
-- `TargetMods`: `BAUBLES`, `TRAVELLERS_GEAR`.
-- `MixinItemArmorJetpackBauble` (legacy `IBauble`) + `MixinItemArmorJetpackBaubleExpanded`
-  (`IBaubleExpanded.getBaubleTypes`, only when the expanded API class is present).
-- `MixinItemArmorJetpackTravellersGear` (gated by mod + config).
-- `JetpackWorn` resolver (+ double-jetpack policy).
-- `JetpackRenderer` + `ModelJetpack` on `RenderPlayerEvent.Specials.Pre` (client only); no double render
-  for the chest slot.
-- Optional chargepad mixins.
-- Dev deps in `dependencies.gradle` (Baubles/TravellersGear, `devOnlyNonPublishable`, exact coordinates
-  to verify against the GTNH Maven/target pack).
+Status: done. The flight tick is unchanged; the resolver now also finds a jetpack in the optional slot
+mods.
+
+- `TargetMods`: `BAUBLES("Baubles")`, `TRAVELLERS_GEAR("TravellersGear")`.
+- Baubles mixins:
+  - `MixinItemArmorJetpackBauble` (legacy `IBauble`, `BaubleType.BELT`) applies when the expanded API is
+    absent.
+  - `MixinItemArmorJetpackBaubleExpanded` (`IBaubleExpanded.getBaubleTypes` = `baubleSlotTypes`) applies
+    when `baubles.api.expanded.IBaubleExpanded` is present. The two are mutually exclusive.
+- `MixinItemArmorJetpackTravellersGear` (`ITravellersGear.getSlot` = `travellersGearSlot.index`) applies
+  only when TravellersGear is loaded and the slot is not `OFF`.
+- `JetpackWorn` now has common `SlotProvider` hooks; `IC2Tweaks.preInit` registers `BaublesCompat` /
+  `TravellersGearCompat` only when the corresponding mod is loaded, so the common resolver never
+  references the optional APIs.
+- `BaublesCompat` scans the Baubles/Expanded inventory; `TravellersGearCompat` reads the configured
+  extended-inventory slot. Chest slot still wins; exactly one stack is ticked.
+- `JetpackRenderer` + `ModelJetpack` on `RenderPlayerEvent.Specials.Post`: a torso model offset behind the
+  player, using IC2's `jetpack_1.png`; the chest slot is skipped (vanilla renders it). The renderer is
+  registered by reflection only on the client so no client class enters the server path.
+- Dependencies: `Baubles-Expanded:2.2.27-GTNH:dev` for compile + dev runtime; TravellersGear's CurseForge
+  jar is `compileOnly` because it is reobfuscated (production packs ship the real jar).
+- The canary now checks the Baubles mixin marker and drains a jetpack placed in a Baubles slot
+  (`drained=10.0`); TravellersGear checks are conditional on the mod being loaded.
+- Remaining Phase 2 limitations: the model is the zero-art offset-torso version (a dedicated tank/nozzle
+  model is Phase 3); TG armour-stand rendering is not covered; a quantum/GraviSuite chest plus a bauble
+  jetpack still has two thrust sources (Phase 3 compatibility).
 
 ### Phase 3 - Polish
 
@@ -522,9 +540,13 @@ com/mrfuzzihead/ic2tweaks/jetpack/
   mixins/early/minecraft/MixinEntityPlayerArmorValue.java   (done, Phase 1)
   mixins/EarlyMixinsLoader.java                             (done, Phase 1)
   mixins/late/ic2/MixinItemArmorJetpack.java                (done, Phase 1)
-  mixins/late/ic2/MixinItemArmorJetpackBauble.java
-  mixins/late/ic2/MixinItemArmorJetpackBaubleExpanded.java
-  mixins/late/ic2/MixinItemArmorJetpackTravellersGear.java
+  mixins/late/ic2/MixinItemArmorJetpackBauble.java          (done, Phase 2)
+  mixins/late/ic2/MixinItemArmorJetpackBaubleExpanded.java  (done, Phase 2)
+  mixins/late/ic2/MixinItemArmorJetpackTravellersGear.java  (done, Phase 2)
+  jetpack/compat/BaublesCompat.java                         (done, Phase 2)
+  jetpack/compat/TravellersGearCompat.java                  (done, Phase 2)
+  jetpack/client/JetpackRenderer.java                       (done, Phase 2)
+  jetpack/client/ModelJetpack.java                          (done, Phase 2)
   mixins/late/ic2/MixinTileEntityChargepad*.java     (optional)
   mixins/late/ic2/MixinItemArmorQuantumSuit.java     (optional)
 src/main/resources/mixins.ic2tweaks.early.json         (done, Phase 1)
@@ -544,8 +566,11 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
 - The mod currently declares `acceptableRemoteVersions = "*"`; a vanilla client on a server with
   IC2Tweaks gets stock IC2 jetpack physics but the server's fuel rules. Keep that in mind for balance
   and document it.
-- The late mixins are applied on both sides; the `IBauble`/`ITravellersGear` mixins are only applied
-  when the corresponding mod is present and the config is on (restart required).
+- The late mixins are applied on both sides; the `IBauble`/`IBaubleExpanded`/`ITravellersGear` mixins are
+  only applied when the corresponding mod is present and the config is on (restart required).
+- The optional slot APIs stay out of the common resolver: `JetpackWorn` uses the `SlotProvider` hooks and
+  `IC2Tweaks.preInit` only loads `BaublesCompat`/`TravellersGearCompat` when the mod is present. The
+  renderer is registered by reflection on the client only.
 - Vanilla classes such as `EntityPlayer` need an **early** mixin: the mod now has the
   `EarlyMixinsLoader` coremod and `mixins.ic2tweaks.early.json`. The early mixin is always applied and
   its runtime config check makes it inert when disabled.
@@ -594,11 +619,11 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
 
 1. **Replace vs add on top** of IC2's physics: **resolved in Phase 1** - the stock tick is replaced,
    gated by `enableJetpackTweaks`; a runtime disable falls back to the stock body.
-2. **Slot priority** when several jetpack sources are worn (chest > bauble > TG recommended; one source
-   only). Phase 2.
-3. **Baubles slot type list**: `cape,body,belt` (default) vs `belt` only vs `body` only. `cape` is the
-   best fit in this pack; `body` is the cleanest semantically but not assigned by default. Phase 2.
-4. **TG slot**: cloak (back, but conflicts with TG cloaks) vs shoulders (less useful). Phase 2.
+2. **Slot priority** when several jetpack sources are worn: **resolved** - chest wins, then Baubles, then
+   TravellersGear; exactly one stack is ticked.
+3. **Baubles slot type list**: **resolved** - default `cape,body,belt`; legacy original Baubles falls back
+   to the belt slot because the 1.7.10 `BaubleType` copies do not reliably expose `UNIVERSAL`.
+4. **TG slot**: **resolved** - default CLOAK (back), configurable to SHOULDERS/OFF.
 5. **Balance**: keep the gas/electric asymmetry or bring the electric jetpack up to gas endurance/lift?
    Config defaults matter here. Open.
 6. **Quantum suit**: include it in v1 or defer? It is the same code and the same bugs, but it is a

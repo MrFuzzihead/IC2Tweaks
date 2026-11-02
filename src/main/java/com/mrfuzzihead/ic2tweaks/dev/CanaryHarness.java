@@ -7,6 +7,7 @@ import java.util.UUID;
 import net.minecraft.block.Block;
 import net.minecraft.entity.passive.EntityCow;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
@@ -24,6 +25,7 @@ import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Motion;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRules;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import ic2.api.energy.EnergyNet;
@@ -55,6 +57,12 @@ public final class CanaryHarness {
     private ItemStack jetpackStack;
     private double jetpackChargeBefore;
     private double jetpackChargeAfter;
+    private EntityPlayer baublesPlayer;
+    private double baublesChargeBefore;
+    private double baublesChargeAfter;
+    private EntityPlayer travellersGearPlayer;
+    private double travellersGearChargeBefore;
+    private double travellersGearChargeAfter;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -148,29 +156,96 @@ public final class CanaryHarness {
 
     private void buildJetpackProbe() {
         try {
-            jetpackStack = Ic2Items.jetpack.copy();
-            ItemArmorJetpack jetpack = (ItemArmorJetpack) jetpackStack.getItem();
-            jetpack.filltank(jetpackStack);
-            StackUtil.getOrCreateNbtData(jetpackStack)
-                .setBoolean("hoverMode", true);
-
-            jetpackPlayer = new CanaryPlayer(world, new GameProfile(UUID.randomUUID(), "ic2tweaks_canary"));
+            jetpackStack = makeJetpack();
+            jetpackPlayer = makePlayer("ic2tweaks_canary");
             jetpackPlayer.inventory.armorInventory[2] = jetpackStack;
-            jetpackChargeBefore = jetpack.getCharge(jetpackStack);
+            jetpackChargeBefore = charge(jetpackStack);
 
             // Tick the real player object directly. The handler must drain hover fuel and reset fall
             // distance; this exercises the mixin + handler, not just the pure maths.
-            for (int i = 0; i < 10; i++) {
-                jetpackPlayer.setPosition(6.5D, Y + 40.0D, 0.5D);
-                jetpackPlayer.motionY = 0.0D;
-                jetpackPlayer.onGround = false;
-                jetpackPlayer.onUpdate();
-            }
-            jetpackChargeAfter = jetpack.getCharge(jetpackStack);
-        } catch (RuntimeException e) {
+            tick(jetpackPlayer, 10);
+            jetpackChargeAfter = charge(jetpackStack);
+        } catch (Exception e) {
             failures.add("jetpack probe: " + e);
             IC2Tweaks.LOG.error("[canary] jetpack probe failed", e);
         }
+        buildBaublesProbe();
+        buildTravellersGearProbe();
+    }
+
+    private void buildBaublesProbe() {
+        if (!Loader.isModLoaded("Baubles")) {
+            return;
+        }
+        try {
+            ItemStack stack = makeJetpack();
+            baublesPlayer = makePlayer("ic2tweaks_baubles");
+            IInventory inventory = (IInventory) Class.forName("baubles.api.BaublesApi")
+                .getMethod("getBaubles", EntityPlayer.class)
+                .invoke(null, baublesPlayer);
+            if (inventory == null) {
+                failures.add("baubles probe: inventory is null");
+                return;
+            }
+            inventory.setInventorySlotContents(3, stack);
+            baublesChargeBefore = charge(stack);
+            tick(baublesPlayer, 10);
+            baublesChargeAfter = charge(stack);
+        } catch (Exception e) {
+            failures.add("baubles probe: " + e);
+            IC2Tweaks.LOG.error("[canary] baubles probe failed", e);
+        }
+    }
+
+    private void buildTravellersGearProbe() {
+        if (!Loader.isModLoaded("TravellersGear")) {
+            return;
+        }
+        try {
+            ItemStack stack = makeJetpack();
+            travellersGearPlayer = makePlayer("ic2tweaks_tg");
+            Class<?> api = Class.forName("travellersgear.api.TravellersGearAPI");
+            ItemStack[] inventory = (ItemStack[]) api.getMethod("getExtendedInventory", EntityPlayer.class)
+                .invoke(null, travellersGearPlayer);
+            if (inventory == null || inventory.length == 0) {
+                failures.add("travellersgear probe: inventory is null");
+                return;
+            }
+            inventory[0] = stack;
+            api.getMethod("setExtendedInventory", EntityPlayer.class, ItemStack[].class)
+                .invoke(null, travellersGearPlayer, (Object) inventory);
+            travellersGearChargeBefore = charge(stack);
+            tick(travellersGearPlayer, 10);
+            travellersGearChargeAfter = charge(stack);
+        } catch (Exception e) {
+            failures.add("travellersgear probe: " + e);
+            IC2Tweaks.LOG.error("[canary] travellersgear probe failed", e);
+        }
+    }
+
+    private CanaryPlayer makePlayer(String name) {
+        return new CanaryPlayer(world, new GameProfile(UUID.randomUUID(), name));
+    }
+
+    private static ItemStack makeJetpack() {
+        ItemStack stack = Ic2Items.jetpack.copy();
+        ((ItemArmorJetpack) stack.getItem()).filltank(stack);
+        StackUtil.getOrCreateNbtData(stack)
+            .setBoolean("hoverMode", true);
+        return stack;
+    }
+
+    private void tick(EntityPlayer player, int ticks) {
+        for (int i = 0; i < ticks; i++) {
+            player.setPosition(6.5D, Y + 40.0D, 0.5D);
+            player.motionY = 0.0D;
+            player.onGround = false;
+            player.onUpdate();
+        }
+    }
+
+    private static double charge(ItemStack stack) {
+        return ((ItemArmorJetpack) stack.getItem()).getCharge(stack);
     }
 
     private static final class CanaryPlayer extends EntityPlayer {
@@ -371,6 +446,31 @@ public final class CanaryHarness {
                 "jetpack handler keeps a real player's fall distance reset",
                 jetpackPlayer.fallDistance == 0.0F,
                 "fall=" + jetpackPlayer.fallDistance);
+        }
+        if (Loader.isModLoaded("Baubles")) {
+            check(
+                "jetpack bauble mixin applied",
+                hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleMixinApplied")
+                    || hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied"),
+                "Baubles");
+        }
+        if (Loader.isModLoaded("TravellersGear")) {
+            check(
+                "jetpack travellersgear mixin applied",
+                hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied"),
+                "TravellersGear");
+        }
+        if (baublesPlayer != null) {
+            check(
+                "jetpack resolver drains a Baubles-slot jetpack",
+                baublesChargeBefore - baublesChargeAfter >= 8.0D,
+                "drained=" + (baublesChargeBefore - baublesChargeAfter));
+        }
+        if (travellersGearPlayer != null) {
+            check(
+                "jetpack resolver drains a TravellersGear-slot jetpack",
+                travellersGearChargeBefore - travellersGearChargeAfter >= 8.0D,
+                "drained=" + (travellersGearChargeBefore - travellersGearChargeAfter));
         }
     }
 

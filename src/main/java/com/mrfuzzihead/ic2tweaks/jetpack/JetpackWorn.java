@@ -15,15 +15,50 @@ public final class JetpackWorn {
     /** Armour inventory index of the chestplate slot. */
     public static final int CHEST_SLOT = 2;
 
+    /** Supplies a jetpack from an optional slot mod without the common code referencing that mod. */
+    public interface SlotProvider {
+
+        ItemStack findWorn(EntityPlayer player);
+    }
+
+    private static SlotProvider baublesProvider;
+    private static SlotProvider travellersGearProvider;
+
     private JetpackWorn() {}
 
+    /** Registers the Baubles/Expanded resolver. Only call when Baubles is loaded. */
+    public static void registerBaubles(SlotProvider provider) {
+        baublesProvider = provider;
+    }
+
+    /** Registers the TravellersGear resolver. Only call when TravellersGear is loaded. */
+    public static void registerTravellersGear(SlotProvider provider) {
+        travellersGearProvider = provider;
+    }
+
     /**
-     * @return the worn jetpack stack, or {@code null}. The chest slot wins, matching stock IC2; Phase 2 adds
-     *         the Baubles and TravellersGear slots as fallbacks.
+     * @return the worn jetpack stack, or {@code null}. The chest slot wins, matching stock IC2; the
+     *         Baubles/Expanded and TravellersGear slots are fallbacks. Exactly one stack is returned per
+     *         player, so the handler never ticks two jetpacks at once.
      */
     public static ItemStack get(EntityPlayer player) {
         ItemStack chest = player.inventory.armorInventory[CHEST_SLOT];
-        return isStockJetpack(chest) ? chest : null;
+        if (isStockJetpack(chest)) {
+            return chest;
+        }
+        if (baublesProvider != null) {
+            ItemStack found = baublesProvider.findWorn(player);
+            if (isStockJetpack(found)) {
+                return found;
+            }
+        }
+        if (travellersGearProvider != null) {
+            ItemStack found = travellersGearProvider.findWorn(player);
+            if (isStockJetpack(found)) {
+                return found;
+            }
+        }
+        return null;
     }
 
     /**
