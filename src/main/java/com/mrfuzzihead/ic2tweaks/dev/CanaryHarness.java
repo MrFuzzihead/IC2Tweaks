@@ -2,16 +2,27 @@ package com.mrfuzzihead.ic2tweaks.dev;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.passive.EntityCow;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChunkCoordinates;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import com.mojang.authlib.GameProfile;
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Kind;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Motion;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRules;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -22,6 +33,8 @@ import ic2.api.energy.tile.IEnergySource;
 import ic2.core.Ic2Items;
 import ic2.core.block.wiring.TileEntityElectricBlock;
 import ic2.core.block.wiring.TileEntityTransformer;
+import ic2.core.item.armor.ItemArmorJetpack;
+import ic2.core.util.StackUtil;
 
 /**
  * Temporary Phase-3 canary harness. Enabled with {@code -Dic2tweaks.canary=true}; builds four IC2 rigs in
@@ -38,6 +51,10 @@ public final class CanaryHarness {
     private boolean started;
     private boolean reported;
     private EntityCow shockCow;
+    private EntityPlayer jetpackPlayer;
+    private ItemStack jetpackStack;
+    private double jetpackChargeBefore;
+    private double jetpackChargeAfter;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -111,6 +128,8 @@ public final class CanaryHarness {
         shockCow.setPosition(0.5D, Y, 18.5D);
         world.spawnEntityInWorld(shockCow);
 
+        buildJetpackProbe();
+
         if (mfsu1 == null || sink1 == null
             || mfsu2 == null
             || cable2 == null
@@ -124,6 +143,56 @@ public final class CanaryHarness {
             || sink4 == null) {
             failures.add("rig placement returned a null tile entity");
             IC2Tweaks.LOG.error("[canary] placement failed; see above");
+        }
+    }
+
+    private void buildJetpackProbe() {
+        try {
+            jetpackStack = Ic2Items.jetpack.copy();
+            ItemArmorJetpack jetpack = (ItemArmorJetpack) jetpackStack.getItem();
+            jetpack.filltank(jetpackStack);
+            StackUtil.getOrCreateNbtData(jetpackStack)
+                .setBoolean("hoverMode", true);
+
+            jetpackPlayer = new CanaryPlayer(world, new GameProfile(UUID.randomUUID(), "ic2tweaks_canary"));
+            jetpackPlayer.inventory.armorInventory[2] = jetpackStack;
+            jetpackChargeBefore = jetpack.getCharge(jetpackStack);
+
+            // Tick the real player object directly. The handler must drain hover fuel and reset fall
+            // distance; this exercises the mixin + handler, not just the pure maths.
+            for (int i = 0; i < 10; i++) {
+                jetpackPlayer.setPosition(6.5D, Y + 40.0D, 0.5D);
+                jetpackPlayer.motionY = 0.0D;
+                jetpackPlayer.onGround = false;
+                jetpackPlayer.onUpdate();
+            }
+            jetpackChargeAfter = jetpack.getCharge(jetpackStack);
+        } catch (RuntimeException e) {
+            failures.add("jetpack probe: " + e);
+            IC2Tweaks.LOG.error("[canary] jetpack probe failed", e);
+        }
+    }
+
+    private static final class CanaryPlayer extends EntityPlayer {
+
+        CanaryPlayer(World world, GameProfile profile) {
+            super(world, profile);
+        }
+
+        @Override
+        public boolean canCommandSenderUseCommand(int permissionLevel, String command) {
+            return true;
+        }
+
+        @Override
+        public void addChatMessage(IChatComponent component) {}
+
+        @Override
+        public ChunkCoordinates getPlayerCoordinates() {
+            return new ChunkCoordinates(
+                MathHelper.floor_double(posX),
+                MathHelper.floor_double(posY),
+                MathHelper.floor_double(posZ));
         }
     }
 
@@ -150,6 +219,7 @@ public final class CanaryHarness {
     }
 
     private void report() {
+        reportJetpackPhysics();
         logStorage("S3 source A", world.getTileEntity(-1, Y, 12));
         logStorage("S3 source B", world.getTileEntity(1, Y, 12));
         logStorage("S3 sink", world.getTileEntity(0, Y, 12));
@@ -241,6 +311,80 @@ public final class CanaryHarness {
         } else {
             IC2Tweaks.LOG.error("[canary] RESULT: {} FAILURE(S): {}", failures.size(), failures);
         }
+    }
+
+    private void reportJetpackPhysics() {
+        double gasNormal = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.NORMAL, Kind.GAS, 1.0D));
+        double gasHover = JetpackPhysics.metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.HOVER, Kind.GAS, 1.0D));
+        double electricNormal = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.NORMAL, Kind.ELECTRIC, 0.7D));
+        double electricHover = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.HOVER, Kind.ELECTRIC, 0.7D));
+        check("jetpack stock gas normal horizontal speed", approx(gasNormal, 0.533333D), "m/s=" + gasNormal);
+        check("jetpack stock gas hover horizontal speed", approx(gasHover, 3.555556D), "m/s=" + gasHover);
+        check(
+            "jetpack stock electric normal horizontal speed",
+            approx(electricNormal, 0.746667D),
+            "m/s=" + electricNormal);
+        check(
+            "jetpack stock electric hover horizontal speed",
+            approx(electricHover, 2.862222D),
+            "m/s=" + electricHover);
+
+        Motion motion = new Motion();
+        JetpackPhysics.applyHorizontal(motion, 1.0D, 0.0D, 0.0D, 0.32D, 1.0D, 0.08D, 0.8D, 0.6D, 1.0D);
+        check("jetpack configured horizontal target", approx(motion.z, 0.32D), "z=" + motion.z);
+        check(
+            "jetpack stock gas endurance",
+            approx(JetpackPhysics.secondsOfFlight(30000.0D, 2), 750.0D),
+            "seconds=" + JetpackPhysics.secondsOfFlight(30000.0D, 2));
+
+        check(
+            "jetpack hover idle on the ground does not thrust",
+            !JetpackRules.shouldThrust(false, true, true),
+            "hover\nonGround");
+        check("jetpack jump on the ground thrusts", JetpackRules.shouldThrust(true, false, true), "jump\nonGround");
+        check(
+            "jetpack riding blocks the jetpack",
+            !JetpackRules.canOperate(false, true, false, false, false, false, false),
+            "riding");
+        check("jetpack fuel boundary blocks thrust", !JetpackRules.canConsume(1.0D, 2), "charge=1 cost=2");
+        check(
+            "jetpack tick mixin applied",
+            hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$jetpackTickReplaced"),
+            "ItemArmorJetpack");
+        check(
+            "jetpack armor HUD mixin applied",
+            hasIc2TweaksMethod(EntityPlayer.class, "ic2tweaks$armorHudMixinApplied"),
+            "EntityPlayer");
+
+        if (jetpackPlayer == null) {
+            check("jetpack handler real-player probe", false, "player=null");
+        } else {
+            double drained = jetpackChargeBefore - jetpackChargeAfter;
+            check(
+                "jetpack handler drains hover fuel for a real player",
+                drained >= 8.0D && drained <= 10.0D,
+                "drained=" + drained);
+            check(
+                "jetpack handler keeps a real player's fall distance reset",
+                jetpackPlayer.fallDistance == 0.0F,
+                "fall=" + jetpackPlayer.fallDistance);
+        }
+    }
+
+    private static boolean hasIc2TweaksMethod(Class<?> clazz, String name) {
+        try {
+            clazz.getDeclaredMethod(name);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    private static boolean approx(double actual, double expected) {
+        return Math.abs(actual - expected) < 1.0E-5D;
     }
 
     private void logStorage(String name, TileEntity tile) {

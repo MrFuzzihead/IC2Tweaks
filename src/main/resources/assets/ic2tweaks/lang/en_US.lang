@@ -8,3 +8,5 @@ ic2tweaks.waila.config.energy=Show energy storage
 ic2tweaks.waila.config.tier=Show tier / voltage
 ic2tweaks.waila.config.output=Show output
 ic2tweaks.waila.config.progress=Show machine progress
+ic2tweaks.jetpack.hover.on=Hover mode enabled
+ic2tweaks.jetpack.hover.off=Hover mode disabled

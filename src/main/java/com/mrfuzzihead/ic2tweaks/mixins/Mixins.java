@@ -6,6 +6,7 @@ import com.gtnewhorizon.gtnhmixins.builders.IMixins;
 import com.gtnewhorizon.gtnhmixins.builders.MixinBuilder;
 import com.mrfuzzihead.ic2tweaks.WrenchConfig;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
 
 /**
  * Mixin registry for the IC2 core tweaks.
@@ -57,7 +58,17 @@ public enum Mixins implements IMixins {
     CABLE_ABSORPTION(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinTileEntityCable")
         .addRequiredMod(TargetMods.IC2)
-        .setApplyIf(() -> EnetOverloadConfig.enabled));
+        .setApplyIf(() -> EnetOverloadConfig.enabled)),
+
+    /** Replaces IC2's stock jetpack tick with the Phase 1 flight handler. */
+    JETPACK(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemArmorJetpack")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> JetpackConfig.enabled)),
+
+    /** Makes the vanilla armour bar honour ISpecialArmor.getArmorDisplay (hides the jetpack's fake 8 points). */
+    JETPACK_ARMOR_HUD(new MixinBuilder().setPhase(Phase.EARLY)
+        .addCommonMixins("minecraft.MixinEntityPlayerArmorValue"));
 
     private final MixinBuilder builder;
 

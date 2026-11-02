@@ -27,6 +27,12 @@ that changes to IC2 itself can be shipped and versioned independently.
   wrench use IC2's lossless path. The cost is balanced: normal wrenches pay 40 durability (4× the normal
   10) and electric wrenches pay 10,000 EU (IC2's native lossless cost, 200 damage × 50 EU).
   Blocks that already drop 100% of the time keep the normal 10-damage cost.
+- **Jetpack improvements (Phase 1)**: IC2's stock jetpack tick is replaced by a configurable flight
+  controller: full 8-direction horizontal flight with acceleration/braking and the IC2 boost key,
+  configurable hover/ascent, drain-before-thrust, guards for riding/creative flight/water/lava, a
+  per-player hover state that no longer depends on the old NBT sync, and a HUD fix that hides the
+  jetpack's fake 8 armour points. The Baubles-Expanded/TravellersGear slot integration is Phase 2. See
+  `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
   (BatBox, CESU, MFE, MFSU, chargepads and addon storage) and for ordinary `TileEntityElectricMachine`
@@ -163,6 +169,31 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   tin). Packet mode uses 1.12.2's 0.2 for tin regardless of insulation; the tooltip follows the active
   table.
 
+`jetpack` category (Phase 1: the flight tick is active; the Baubles/TravellersGear slot options take
+effect in Phase 2):
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `enableJetpackTweaks` | `true` | Master switch for the jetpack tweaks. Requires a restart |
+| `horizontalSpeed` | `0.32` | Target horizontal speed in blocks/tick while a movement key is held (about 6.4 m/s) |
+| `horizontalAccel` / `horizontalBrake` | `0.05` / `0.08` | How quickly horizontal velocity builds up / bleeds off, in blocks/tick per tick |
+| `strafeFactor` / `backwardFactor` | `0.8` / `0.6` | Sideways and backwards speed multipliers |
+| `boostMultiplier` / `boostFuelMultiplier` | `1.6` / `2.5` | IC2 boost-key speed and fuel multipliers |
+| `ascentSpeed` | `0.6` | Maximum normal ascent speed in blocks/tick (stock IC2 is 0.6 b/t) |
+| `hoverRise` / `hoverSink` / `hoverIdle` | `0.2` / `0.2` / `0.0` | Hover-mode vertical speeds in blocks/tick |
+| `electricHoverFactor` | `0.5` | Scales the electric jetpack's hover speeds (stock 0.1 instead of 0.2) |
+| `electricPowerFactor` | `0.7` | Normal-mode lift/horizontal multiplier for the electric jetpack (stock 0.7; set 1.0 for gas parity) |
+| `gasFuelPerTick` / `gasHoverFuelPerTick` | `2` / `1` | Biogas mB/tick in normal/hover mode |
+| `electricEuPerTick` / `electricHoverEuPerTick` | `8` / `7` | EU/tick in normal/hover mode |
+| `altitudeFadeBlocks` / `electricAltitudeFactor` | `25` / `1.28` | Altitude fade length and electric ceiling divisor |
+| `baubleSlotTypes` | `cape,body,belt` | Comma-separated Baubles slot types; `OFF` disables. Requires a restart |
+| `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
+| `slotFuelMultiplier` | `1.0` | Extra fuel multiplier while worn in a bauble/TG slot |
+| `allowInWater` / `allowInLava` | `false` | Allow thrust in water/lava |
+| `creativeNoDrain` / `fallProtection` | `true` / `false` | Creative no-drain; keep fall protection while charged |
+| `stripJetpackArmorDisplay` | `true` | Hide the misleading 8 HUD armour points the diamond-material jetpack shows despite 0 absorption |
+| `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
+
 ## API
 
 Mods whose machines should survive (or shrink) an over-voltage packet can implement either interface on
@@ -177,7 +208,9 @@ Both mirror IC2 Experimental 1.12.2's interfaces of the same name.
 
 ## Diagnostics
 
-Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
+Run `/ic2tweaks status` in-game to confirm the energy-net and wrench features are live, or
+`/ic2tweaks jetpack` for the jetpack config, the tick/HUD mixin markers and the stock/configured
+horizontal speeds. `status` reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
 - `wrench mixin active` — whether the wrench drop-rate mixin was applied, plus the `losslessWrench` value and its durability/EU costs
@@ -201,7 +234,9 @@ With packet mode enabled, run:
 JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
 ```
 
-The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It is
+The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It also
+checks the pure jetpack physics, the jetpack/HUD mixin markers, and ticks a real `EntityPlayer` with a
+filled gas jetpack in hover mode to verify the handler drains fuel and resets fall distance. It is
 inactive unless the system property is set and is not part of normal gameplay.
 
 ```bash

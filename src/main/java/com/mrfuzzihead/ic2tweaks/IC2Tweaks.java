@@ -10,6 +10,8 @@ import com.mrfuzzihead.ic2tweaks.compat.waila.WailaIntegrationState;
 import com.mrfuzzihead.ic2tweaks.enet.EnetCableEffects;
 import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
@@ -33,6 +35,7 @@ public class IC2Tweaks {
 
     private final EnetConductorRegistry conductorRegistry = new EnetConductorRegistry();
     private final EnetCableEffects cableEffects = new EnetCableEffects(conductorRegistry);
+    private final JetpackHandler jetpackHandler = new JetpackHandler();
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
@@ -40,8 +43,23 @@ public class IC2Tweaks {
         // file first (it usually does).
         EnetOverloadConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         WrenchConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        JetpackConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         LOG.info("Energy-net model: {}", EnetOverloadConfig.packetModel ? "packet (1.12.2-style)" : "legacy per-node");
         LOG.info("Lossless wrenching: {}", WrenchConfig.lossless);
+        LOG.info(
+            "Jetpack tweaks: {} (horizontal {} b/t, gas {}/{} mB/t, electric {}/{} EU/t)",
+            JetpackConfig.enabled ? "enabled" : "disabled",
+            JetpackConfig.horizontalSpeed,
+            JetpackConfig.gasFuelPerTick,
+            JetpackConfig.gasHoverFuelPerTick,
+            JetpackConfig.electricEuPerTick,
+            JetpackConfig.electricHoverEuPerTick);
+        if (JetpackConfig.isBaubleSlotEnabled()) {
+            LOG.info("Jetpack Baubles slots: {}", JetpackConfig.baubleSlotTypesCsv());
+        }
+        if (JetpackConfig.travellersGearSlot != JetpackConfig.TravellersGearSlot.OFF) {
+            LOG.info("Jetpack TravellersGear slot: {}", JetpackConfig.travellersGearSlot);
+        }
         if (WrenchConfig.lossless) {
             LOG.info(
                 "Lossless wrench cost: {} durability / {} EU",
@@ -55,6 +73,13 @@ public class IC2Tweaks {
         FMLCommonHandler.instance()
             .bus()
             .register(cableEffects);
+
+        // The jetpack handler owns the tick, fuel accounting and client motion/audio. Register it on both
+        // buses: PlayerTickEvent lives on the FML bus, WorldEvent.Unload on the Forge bus.
+        FMLCommonHandler.instance()
+            .bus()
+            .register(jetpackHandler);
+        MinecraftForge.EVENT_BUS.register(jetpackHandler);
 
         if (Boolean.getBoolean("ic2tweaks.canary")) {
             FMLCommonHandler.instance()
