@@ -30,7 +30,7 @@ final class JetpackState {
     /** Server-only counter for the optional low-frequency charge/NBT sync. */
     int syncCounter;
 
-    /** Whether thrust was applied last tick; reserved for the Phase 3 HUD. */
+    /** Whether thrust was applied last tick; available for display/telemetry. */
     boolean thrusting;
 
     void stopAudio() {

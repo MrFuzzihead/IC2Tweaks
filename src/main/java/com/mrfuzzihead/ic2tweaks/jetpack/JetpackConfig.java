@@ -151,6 +151,34 @@ public final class JetpackConfig {
     public static boolean stripJetpackArmorDisplay = true;
 
     // ---------------------------------------------------------------------------------------------
+    // HUD, tooltips and particles
+    // ---------------------------------------------------------------------------------------------
+
+    /** Show the jetpack HUD while a jetpack is worn. */
+    public static boolean hudEnabled = true;
+
+    /** Screen corner for the jetpack HUD. */
+    public static HudCorner hudCorner = HudCorner.TOP_LEFT;
+
+    /** Show the horizontal speed on the jetpack HUD. */
+    public static boolean hudShowSpeed = true;
+
+    /** Show the player's altitude on the jetpack HUD. */
+    public static boolean hudShowAltitude = true;
+
+    /** Fuel percentage at or below which the HUD shows a low-fuel warning. 0 disables the warning. */
+    public static int hudLowFuelPercent = 10;
+
+    /** Add the jetpack status/controls lines to the item tooltip. */
+    public static boolean tooltipsEnabled = true;
+
+    /** Show exhaust particles while the jetpack is thrusting. */
+    public static boolean particlesEnabled = true;
+
+    /** Ticks between exhaust particle emissions. 0 disables them (the same as particlesEnabled=false). */
+    public static int particleIntervalTicks = 2;
+
+    // ---------------------------------------------------------------------------------------------
     // Slot integration
     // ---------------------------------------------------------------------------------------------
 
@@ -186,6 +214,28 @@ public final class JetpackConfig {
      * value to periodically re-sync the authoritative stack for GUIs.
      */
     public static int syncIntervalTicks = 0;
+
+    /** Screen corners supported by the jetpack HUD. */
+    public enum HudCorner {
+
+        TOP_LEFT,
+        TOP_RIGHT,
+        BOTTOM_LEFT,
+        BOTTOM_RIGHT;
+
+        public static HudCorner fromString(String value) {
+            if (value == null) {
+                return TOP_LEFT;
+            }
+            try {
+                return valueOf(
+                    value.trim()
+                        .toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                return TOP_LEFT;
+            }
+        }
+    }
 
     /** Slots supported by the TravellersGear integration. */
     public enum TravellersGearSlot {
@@ -444,6 +494,50 @@ public final class JetpackConfig {
             "The jetpack's ISpecialArmor absorption is 0, but as a diamond-material chestplate it makes the "
                 + "vanilla HUD display 8 armour points. When true, the HUD uses the Forge ISpecialArmor "
                 + "display value instead (0 for the jetpack). Requires a restart.");
+
+        hudEnabled = configuration.getBoolean(
+            "hudEnabled",
+            CATEGORY,
+            true,
+            "Show the jetpack HUD (fuel, mode, speed, altitude) while a jetpack is worn.");
+
+        hudCorner = HudCorner.fromString(
+            configuration.getString(
+                "hudCorner",
+                CATEGORY,
+                "TOP_LEFT",
+                "Screen corner for the jetpack HUD: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT or BOTTOM_RIGHT."));
+
+        hudShowSpeed = configuration
+            .getBoolean("hudShowSpeed", CATEGORY, true, "Show the horizontal speed on the jetpack HUD.");
+
+        hudShowAltitude = configuration
+            .getBoolean("hudShowAltitude", CATEGORY, true, "Show the player's altitude on the jetpack HUD.");
+
+        hudLowFuelPercent = configuration.getInt(
+            "hudLowFuelPercent",
+            CATEGORY,
+            10,
+            0,
+            100,
+            "Fuel percentage at or below which the HUD shows a low-fuel warning. 0 disables the warning.");
+
+        tooltipsEnabled = configuration.getBoolean(
+            "tooltipsEnabled",
+            CATEGORY,
+            true,
+            "Add the jetpack status and controls lines to the item tooltip.");
+
+        particlesEnabled = configuration
+            .getBoolean("particlesEnabled", CATEGORY, true, "Show exhaust particles while the jetpack is thrusting.");
+
+        particleIntervalTicks = configuration.getInt(
+            "particleIntervalTicks",
+            CATEGORY,
+            2,
+            0,
+            20,
+            "Ticks between exhaust particle emissions. 0 disables them.");
 
         String rawBaubleSlotTypes = configuration.getString(
             "baubleSlotTypes",

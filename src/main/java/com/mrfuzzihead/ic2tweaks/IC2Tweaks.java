@@ -81,14 +81,9 @@ public class IC2Tweaks {
             .getSide()
             .isClient()) {
             // Reflection keeps client-only classes out of the server class-loading path.
-            try {
-                Object renderer = Class.forName("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackRenderer")
-                    .getConstructor()
-                    .newInstance();
-                MinecraftForge.EVENT_BUS.register(renderer);
-            } catch (ReflectiveOperationException e) {
-                LOG.warn("Could not register the jetpack renderer", e);
-            }
+            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackRenderer");
+            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackHudOverlay");
+            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackTooltipHandler");
         }
 
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the
@@ -114,6 +109,17 @@ public class IC2Tweaks {
         // Optional Waila integration: Waila reflects into the named method and passes its registrar.
         // The message is harmless when Waila is absent, and the compat class is only loaded by Waila.
         FMLInterModComms.sendMessage("Waila", "register", WailaIntegrationState.REGISTRATION_METHOD);
+    }
+
+    private static void registerClientHandler(String className) {
+        try {
+            Object handler = Class.forName(className)
+                .getConstructor()
+                .newInstance();
+            MinecraftForge.EVENT_BUS.register(handler);
+        } catch (ReflectiveOperationException e) {
+            LOG.warn("Could not register " + className, e);
+        }
     }
 
     @Mod.EventHandler

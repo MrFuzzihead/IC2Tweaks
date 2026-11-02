@@ -213,6 +213,7 @@ public final class JetpackHandler {
 
         if (client) {
             state.updateAudio(player, true);
+            JetpackParticles.spawn(player, kind == JetpackPhysics.Kind.ELECTRIC, boost);
         }
         state.thrusting = true;
     }

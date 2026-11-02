@@ -90,6 +90,15 @@ class JetpackConfigTest {
         assertFalse(JetpackConfig.fallProtection);
         assertTrue(JetpackConfig.stripJetpackArmorDisplay);
 
+        assertTrue(JetpackConfig.hudEnabled);
+        assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.hudCorner);
+        assertTrue(JetpackConfig.hudShowSpeed);
+        assertTrue(JetpackConfig.hudShowAltitude);
+        assertEquals(10, JetpackConfig.hudLowFuelPercent);
+        assertTrue(JetpackConfig.tooltipsEnabled);
+        assertTrue(JetpackConfig.particlesEnabled);
+        assertEquals(2, JetpackConfig.particleIntervalTicks);
+
         assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
         assertEquals(TravellersGearSlot.CLOAK, JetpackConfig.travellersGearSlot);
         assertEquals(1.0F, JetpackConfig.slotFuelMultiplier, 1.0E-6F);
@@ -127,6 +136,14 @@ class JetpackConfigTest {
             .set("40");
         configuration.get(JetpackConfig.CATEGORY, "stripJetpackArmorDisplay", "true")
             .set(false);
+        configuration.get(JetpackConfig.CATEGORY, "hudCorner", "TOP_LEFT")
+            .set("BOTTOM_RIGHT");
+        configuration.get(JetpackConfig.CATEGORY, "hudLowFuelPercent", "10")
+            .set("0");
+        configuration.get(JetpackConfig.CATEGORY, "particlesEnabled", "true")
+            .set(false);
+        configuration.get(JetpackConfig.CATEGORY, "particleIntervalTicks", "2")
+            .set("5");
         configuration.save();
 
         JetpackConfig.synchronizeConfiguration(currentFile);
@@ -143,6 +160,19 @@ class JetpackConfigTest {
         assertEquals(2.0F, JetpackConfig.slotFuelMultiplier, 1.0E-6F);
         assertEquals(40, JetpackConfig.syncIntervalTicks);
         assertFalse(JetpackConfig.stripJetpackArmorDisplay);
+        assertEquals(JetpackConfig.HudCorner.BOTTOM_RIGHT, JetpackConfig.hudCorner);
+        assertEquals(0, JetpackConfig.hudLowFuelPercent);
+        assertFalse(JetpackConfig.particlesEnabled);
+        assertEquals(5, JetpackConfig.particleIntervalTicks);
+    }
+
+    @Test
+    void hudCornerParsingFallsBackToTopLeft() {
+        assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.HudCorner.fromString(null));
+        assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.HudCorner.fromString("banana"));
+        assertEquals(JetpackConfig.HudCorner.TOP_RIGHT, JetpackConfig.HudCorner.fromString(" top_right "));
+        assertEquals(JetpackConfig.HudCorner.BOTTOM_LEFT, JetpackConfig.HudCorner.fromString("BOTTOM_LEFT"));
+        assertEquals(JetpackConfig.HudCorner.BOTTOM_RIGHT, JetpackConfig.HudCorner.fromString("bottom_right"));
     }
 
     @Test

@@ -15,6 +15,15 @@ public final class JetpackWorn {
     /** Armour inventory index of the chestplate slot. */
     public static final int CHEST_SLOT = 2;
 
+    /** Where a jetpack stack is currently worn. */
+    public enum WornSlot {
+
+        NONE,
+        CHEST,
+        BAUBLES,
+        TRAVELLERS_GEAR
+    }
+
     /** Supplies a jetpack from an optional slot mod without the common code referencing that mod. */
     public interface SlotProvider {
 
@@ -80,6 +89,26 @@ public final class JetpackWorn {
 
     /** @return whether the stack is the one currently worn in the chest slot. */
     public static boolean isChestSlot(EntityPlayer player, ItemStack stack) {
-        return player.inventory.armorInventory[CHEST_SLOT] == stack;
+        return player != null && stack != null && player.inventory.armorInventory[CHEST_SLOT] == stack;
+    }
+
+    /**
+     * @return the slot {@code stack} is worn in, or {@link WornSlot#NONE} when it is not currently worn.
+     *         The identity checks match {@link #get(EntityPlayer)}; they are only used for display.
+     */
+    public static WornSlot slotOf(EntityPlayer player, ItemStack stack) {
+        if (player == null || stack == null) {
+            return WornSlot.NONE;
+        }
+        if (isChestSlot(player, stack)) {
+            return WornSlot.CHEST;
+        }
+        if (baublesProvider != null && baublesProvider.findWorn(player) == stack) {
+            return WornSlot.BAUBLES;
+        }
+        if (travellersGearProvider != null && travellersGearProvider.findWorn(player) == stack) {
+            return WornSlot.TRAVELLERS_GEAR;
+        }
+        return WornSlot.NONE;
     }
 }

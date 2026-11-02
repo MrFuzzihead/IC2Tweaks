@@ -221,6 +221,24 @@ public class CommandIc2Tweaks extends CommandBase {
                 + JetpackConfig.travellersGearSlot
                 + ", render "
                 + JetpackConfig.renderWornJetpack);
+        send(
+            sender,
+            "UI: HUD " + JetpackConfig.hudEnabled
+                + " (corner "
+                + JetpackConfig.hudCorner
+                + ", speed "
+                + JetpackConfig.hudShowSpeed
+                + ", altitude "
+                + JetpackConfig.hudShowAltitude
+                + ", low-fuel "
+                + JetpackConfig.hudLowFuelPercent
+                + "%), tooltips "
+                + JetpackConfig.tooltipsEnabled
+                + ", particles "
+                + JetpackConfig.particlesEnabled
+                + " every "
+                + JetpackConfig.particleIntervalTicks
+                + "t");
     }
 
     private static double stockSpeed(Mode mode, Kind kind, double power) {

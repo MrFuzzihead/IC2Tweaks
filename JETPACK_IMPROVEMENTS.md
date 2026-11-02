@@ -1,8 +1,9 @@
 # IC2 Jetpack Improvement Plan
 
 Status: Phase 0 (config + pure physics), Phase 1 (stock tick replacement, horizontal flight, bug fixes,
-armor HUD fix) and Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) implemented. Phase 3
-(HUD/tooltips/particles/quantum suit) is next. Analysis based on decompiled IC2 2.2.828-experimental
+armor HUD fix), Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) and the Phase 3 HUD, tooltips
+and particle pass are implemented. The remaining Phase 3 work is the quantum-suit/GraviSuite/chargepad
+compatibility and the low-priority edge cases. Analysis based on decompiled IC2 2.2.828-experimental
 (`ItemArmorJetpack`, `ItemArmorJetpackElectric`, `ItemArmorFluidTank`, `ItemArmorQuantumSuit`), the
 1.7.10 movement code, the Baubles/TravellersGear 1.7.10 APIs, Hodgepodge 2.7.222 and GraviSuite 2.0.3.
 
@@ -440,6 +441,9 @@ gasLowFuelThreshold, electricLowFuelThreshold
 altitudeFadeBlocks, electricAltitudeFactor
 allowInWater, allowInLava, creativeNoDrain, fallProtection,
 stripJetpackArmorDisplay
+hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
+hudShowSpeed, hudShowAltitude, hudLowFuelPercent
+tooltipsEnabled, particlesEnabled, particleIntervalTicks
 baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
 slotFuelMultiplier, renderWornJetpack, syncIntervalTicks
 ```
@@ -483,7 +487,7 @@ Status: done. `enableJetpackTweaks=true` now replaces the stock tick for the two
   handler drains fuel and resets fall distance, and checks the two mixin markers.
 
 Phase 1 fixes: B1, B2, B3, B4, B6, B7, B8, B9 (configurable), B11, B16, B22. Deferred: B5 (addon creative
-items only), B10 (tooltips/fluid name; the hover messages are localized), B12-B15, B19-B21.
+items only), B12-B15, B19-B21. B10 is resolved by the Phase 3 tooltip pass.
 
 ### Phase 2 - Slots + rendering (implemented)
 
@@ -515,11 +519,22 @@ mods.
   model is Phase 3); TG armour-stand rendering is not covered; a quantum/GraviSuite chest plus a bauble
   jetpack still has two thrust sources (Phase 3 compatibility).
 
-### Phase 3 - Polish
+### Phase 3 - Polish (HUD/tooltips/particles implemented)
 
-- HUD (`RenderGameOverlayEvent.Post`), tooltips (`ItemTooltipEvent`), lang keys, particles.
-- Localize hover messages and the fluid tooltip; add controls text.
-- Optional quantum suit mixin and GraviSuite coexistence checks.
+- [x] HUD (`RenderGameOverlayEvent.Post`): fuel %, hover/normal mode, horizontal speed and altitude,
+  low-fuel/empty warning, configurable corner and line toggles.
+- [x] Tooltips (`ItemTooltipEvent`) and lang keys: localized fuel/charge values, mode, worn slot,
+  tier (advanced tooltips) and controls. IC2's raw `<fluid, amount mB>` gas line is replaced.
+- [x] Exhaust particles (`JetpackParticles`): client-only smoke for gas / flame for electric, with a
+  configurable interval and extra puffs on boost.
+- [ ] Optional quantum suit mixin and GraviSuite coexistence checks.
+
+Implementation: `JetpackHudOverlay` and `JetpackTooltipHandler` are client-only and registered by
+reflection from `IC2Tweaks.preInit`; `JetpackReadout` holds the pure percentage/speed/altitude maths and
+is unit-tested; `JetpackWorn.slotOf` supplies the tooltip's worn-slot line. The HUD reads the worn stack
+through `JetpackWorn`, so it works for the chest, Baubles-Expanded and TravellersGear slots. The
+`hudEnabled`/`hudCorner`/`hudShowSpeed`/`hudShowAltitude`/`hudLowFuelPercent`, `tooltipsEnabled` and
+`particlesEnabled`/`particleIntervalTicks` options are in the `jetpack` config category.
 
 ### Phase 4 - Docs and validation
 
@@ -535,10 +550,13 @@ com/mrfuzzihead/ic2tweaks/jetpack/
   JetpackRules.java             (done, Phase 1)
   JetpackHandler.java           (done, Phase 1: server fuel/fall; client motion/audio)
   JetpackState.java             (done, Phase 1)
-  JetpackWorn.java              (done, Phase 1; Phase 2 adds slots)
-  client/JetpackRenderer.java
-  client/ModelJetpack.java
-  client/JetpackHud.java
+  JetpackWorn.java              (done, Phase 1/2; slotOf for the tooltip)
+  JetpackParticles.java         (done, Phase 3)
+  JetpackReadout.java           (done, Phase 3)
+  client/JetpackRenderer.java   (done, Phase 2)
+  client/ModelJetpack.java      (done, Phase 2)
+  client/JetpackHudOverlay.java (done, Phase 3)
+  client/JetpackTooltipHandler.java (done, Phase 3)
   mixins/early/minecraft/MixinEntityPlayerArmorValue.java   (done, Phase 1)
   mixins/EarlyMixinsLoader.java                             (done, Phase 1)
   mixins/late/ic2/MixinItemArmorJetpack.java                (done, Phase 1)
@@ -547,8 +565,6 @@ com/mrfuzzihead/ic2tweaks/jetpack/
   mixins/late/ic2/MixinItemArmorJetpackTravellersGear.java  (done, Phase 2)
   jetpack/compat/BaublesCompat.java                         (done, Phase 2)
   jetpack/compat/TravellersGearCompat.java                  (done, Phase 2)
-  jetpack/client/JetpackRenderer.java                       (done, Phase 2)
-  jetpack/client/ModelJetpack.java                          (done, Phase 2)
   mixins/late/ic2/MixinTileEntityChargepad*.java     (optional)
   mixins/late/ic2/MixinItemArmorQuantumSuit.java     (optional)
 src/main/resources/mixins.ic2tweaks.early.json         (done, Phase 1)
@@ -556,6 +572,7 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   JetpackPhysicsTest.java       (done, Phase 0)
   JetpackConfigTest.java        (done, Phase 0)
   JetpackRulesTest.java         (done, Phase 1)
+  JetpackReadoutTest.java       (done, Phase 3)
 ```
 
 ### Server/client split (important)
@@ -592,6 +609,8 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   `TravellersGearSlot` parsing and indices, and Forge's min/max clamping.
 - `JetpackRulesTest`: hover-on-the-ground/no-thrust, take-off/jump, riding/dead/creative-flight/water/
   lava guards, and the fuel boundary.
+- `JetpackReadoutTest`: HUD/tooltip percentage clamping/rounding, thousands grouping, horizontal speed,
+  altitude flooring and the low-fuel threshold (including 0 = disabled).
 - Run with `./gradlew test spotlessCheck checkstyleMain checkstyleTest`.
 
 **In-game harness:**
