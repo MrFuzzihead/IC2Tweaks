@@ -1,1 +1,10 @@
 ic2tweaks.tooltip.cableLoss=Loss: %s EU/block
+ic2tweaks.waila.energy=Energy
+ic2tweaks.waila.buffer=Buffer
+ic2tweaks.waila.tier=Tier
+ic2tweaks.waila.output=Output
+ic2tweaks.waila.progress=Progress
+ic2tweaks.waila.config.energy=Show energy storage
+ic2tweaks.waila.config.tier=Show tier / voltage
+ic2tweaks.waila.config.output=Show output
+ic2tweaks.waila.config.progress=Show machine progress

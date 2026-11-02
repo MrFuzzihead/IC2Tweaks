@@ -10,6 +10,7 @@ import net.minecraft.world.World;
 
 import com.mrfuzzihead.ic2tweaks.Tags;
 import com.mrfuzzihead.ic2tweaks.WrenchConfig;
+import com.mrfuzzihead.ic2tweaks.compat.waila.WailaIntegrationState;
 import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 
@@ -102,6 +103,10 @@ public class CommandIc2Tweaks extends CommandBase {
                     + EnetOverloadConfig.packetModelTierVoltage);
         }
         send(sender, "conductors registered in this world: " + conductorCount(sender));
+        send(
+            sender,
+            "waila plugin: "
+                + (WailaIntegrationState.registered ? "registered" : "not registered (Waila absent or not loaded)"));
     }
 
     private int conductorCount(ICommandSender sender) {
