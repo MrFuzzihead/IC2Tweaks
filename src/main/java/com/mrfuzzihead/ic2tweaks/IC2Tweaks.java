@@ -6,12 +6,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.mrfuzzihead.ic2tweaks.command.CommandIc2Tweaks;
+import com.mrfuzzihead.ic2tweaks.compat.waila.WailaIntegrationState;
 import com.mrfuzzihead.ic2tweaks.enet.EnetCableEffects;
 import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
@@ -59,6 +61,10 @@ public class IC2Tweaks {
                 .bus()
                 .register(new com.mrfuzzihead.ic2tweaks.dev.CanaryHarness());
         }
+
+        // Optional Waila integration: Waila reflects into the named method and passes its registrar.
+        // The message is harmless when Waila is absent, and the compat class is only loaded by Waila.
+        FMLInterModComms.sendMessage("Waila", "register", WailaIntegrationState.REGISTRATION_METHOD);
     }
 
     @Mod.EventHandler

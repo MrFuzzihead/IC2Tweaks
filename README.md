@@ -27,6 +27,62 @@ that changes to IC2 itself can be shipped and versioned independently.
   wrench use IC2's lossless path. The cost is balanced: normal wrenches pay 40 durability (4× the normal
   10) and electric wrenches pay 10,000 EU (IC2's native lossless cost, 200 damage × 50 EU).
   Blocks that already drop 100% of the time keep the normal 10-damage cost.
+- **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
+  Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
+  (BatBox, CESU, MFE, MFSU, chargepads and addon storage) and for ordinary `TileEntityElectricMachine`
+  buffers. It shows stored/capacity EU, tier and rated voltage, and the storage block's output. The
+  provider is loaded through Waila's IMC callback, so Waila remains optional.
+
+## Waila / Wawla integration
+
+Waila 1.19.34's IC2 addon (`mcp.mobius.waila.addons.ic2.IC2Module`) only reflects into the five
+generator families (`TileEntityBaseGenerator`, geo, kinetic, semifluid, stirling). It registers no
+provider for `ic2.api.tile.IEnergyStorage` or `TileEntityElectricMachine`, so IC2 storage blocks and
+machines have no body lines. Wawla 1.3.4-GTNH has no IC2 module; its generic block provider only adds
+harvest/light/hardness information.
+
+IC2Tweaks fills the gap through Waila's IMC callback. The integration is optional and is only loaded
+when Waila is installed. It displays:
+
+| Block | Lines |
+| ----- | ----- |
+| BatBox / CESU / MFE / MFSU, chargepads, addon `IEnergyStorage` | `Energy` bar, `Tier: LV/MV/HV/EV (voltage EU/t)`, `Output: N EU/t` |
+| `TileEntityStandardMachine` (macerator, compressor, extractor, recycler, metal former, electric furnace, centrifuge, canner, block cutter, …) | `Buffer` bar, `Progress` bar, `Tier: LV/MV/HV/EV (voltage EU/t)` |
+
+The `Energy`/`Buffer` and `Progress` lines use Waila's `waila.bar` renderer — the same gradient bar the
+vanilla furnace uses for its fuel and smelt lines — rather than plain text. The progress bar shows the
+current operation in seconds (for example `Progress 2.5s / 5.0s` for an Electric Furnace) and follows
+overclocker changes to `operationLength`. Machines that do not extend `TileEntityStandardMachine` (Induction, Magnetizer,
+Scanner, AdvMiner, and the non-electric Iron/Blast Furnace) do not expose those standard progress fields
+and are not covered yet.
+
+The lines can be toggled in Waila's own config under the `IC2Tweaks` module (`ic2tweaks.energy`,
+`ic2tweaks.tier`, `ic2tweaks.output`, `ic2tweaks.progress`). Waila's server-side NBT sync is used when
+available; if Waila is installed only on the client, the provider falls back to reading the client tile
+entity directly. IC2 only continuously syncs a storage block's `energy` field while its GUI is open, so in
+client-only mode the stored value is best-effort; capacity, tier and output are static and remain accurate.
+Note that Waila's built-in IC2 generator options (`ic2.storage`, `ic2.outputeu`) are registered as *remote*
+configs, so they silently return false when Waila is not installed on the server; IC2Tweaks' options are
+client-side and do not have that restriction.
+
+### Addon compatibility
+
+Waila resolves providers with `Class.isInstance`, so IC2Tweaks automatically covers addon TEs that are
+instances of the registered types:
+
+| Addon TE | Automatic lines |
+| -------- | --------------- |
+| extends `TileEntityStandardMachine` (for example AdvancedMachines) | Buffer bar, Progress bar, Tier |
+| extends `TileEntityElectricMachine` | Buffer bar, Tier |
+| implements `IEnergyStorage` | Energy bar, Tier, Output |
+| extends one of Waila's five IC2 generator classes | Waila's built-in generator storage/output lines |
+
+Custom generator bases that only implement `IEnergySource` (for example CompactSolars'
+`TileEntityCompactSolar` or AdvancedSolarPanels' `TileEntitySolarPanel`) are not matched by either
+provider. Those addons need their own Waila provider, or IC2Tweaks would need a generic
+`IEnergySource` provider; CompactSolars keeps its storage fields private, so it would also need getters
+or an interface. A TE that implements `IEnergyStorage` and also extends `TileEntityElectricMachine` is
+currently treated as storage (energy/tier/output) rather than a machine (buffer/progress).
 
 ## Requirements
 
@@ -130,6 +186,7 @@ Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
 - `useLinearTransferModel` and the raw `IC2.ini` value — proves the override forced the linear model
 - the `enableEnet*` sub-toggles
 - how many conductors are registered in the current world
+- `waila plugin` — whether Waila's IMC callback registered the optional provider
 
 ## Building from source
 
