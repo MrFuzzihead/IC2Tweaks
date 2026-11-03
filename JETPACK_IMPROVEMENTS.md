@@ -401,18 +401,18 @@ B1-B4, B6-B9, B11, B16, B22; the entries below remain as the technical record.
 | --- | --- | --- |
 | F1 | TravellersGear cloak slot + Baubles-Expanded cape/wings/body/belt slot, with rendering | The two requested integrations; frees the chest slot. |
 | F2 | Full 8-direction horizontal flight + boost key (afterburner) | The other requested change; IC2's boost key is already synced and unused by the jetpack. GraviSuite's boost is a good precedent. |
-| F3 | Hover improvements: true altitude hold, configurable rise/sink, optional sneak-descend in normal mode | Makes hover usable for building; fixes the "can't get down" feel. |
+| F3 | Hover improvements: true altitude hold, configurable rise/sink, optional sneak-descend in normal mode | Done through `hoverIdle` (0 holds altitude), configurable rise/sink and `hoverMomentum`. |
 | F4 | HUD (fuel %, mode, speed, altitude) + control tooltips + localized messages | The durability bar is coarse (27 states) and the controls are undiscoverable. |
 | F5 | Exhaust particles (smoke/flame) and a start/stop sound | Feedback; the current loop has no visual. |
-| F6 | Fall protection / landing assist | `fallDistance = 0` only while thrusting today; a charged jetpack could soften a landing or auto-hover near the ground (config). |
+| F6 | Fall protection / landing assist | Done: `landingAssist` brakes a fall near the ground on a charged jetpack (`landingAssistDistance`/`landingAssistSpeed`). |
 | F7 | Config for fuel/charge, speed, altitude, slots, guards | The core of a "tweaks" mod; lets packs balance the gas/electric asymmetry. |
 | F8 | Chargepad support for a bauble/TG electric jetpack | Otherwise the new slot cannot be recharged by the usual block. |
 | F9 | Creative no-drain | QoL; the stock jetpack burns fuel in creative. |
 | F10 | Quantum suit unification | Apply the same controller to the quantum's `useJetpack` (config, default off) so all IC2 jetpacks feel the same. |
 | F11 | Optional "armour insert" (NBT-stored chestplate) | A fallback for packs without Baubles/TG (e.g. your 20/26-mod packs); IC2 1.12.2's jetpack attachment is the same idea. Bigger design, only if needed. |
 | F12 | API for addon jetpacks | Optional; a small interface so addons can opt into the new controller. |
-| F13 | Easier gas refuelling | Today the gas jetpack needs a Canning Machine; right-click with a biogas container (or an inventory-based transfer) would be a nice QoL addition. |
-| F14 | Dedicated hover key binding | Jump + mode-switch is undiscoverable (there are GTNH/IC2 forum threads and a modpack issue about exactly this); a real key binding (with the old combo kept as a fallback) is friendlier. |
+| F13 | Easier gas refuelling | Done: right-click a biogas cell/container to fill a worn gas jetpack (`easyGasRefuel`). |
+| F14 | Dedicated hover key binding | Done: default H, configurable in Controls, with the old jump + mode-switch combo retained (`dedicatedHoverKey`). |
 
 ---
 
@@ -562,10 +562,10 @@ The chargepad mixin charges the bauble/TG electric stack at the pad's tier limit
 The quantum integration uses `quantumEuPerTick`/`quantumHoverEuPerTick` (8/10 EU/t) and preserves the
 quantum chest's separate `jetpack` enable toggle (Boost + Mode Switch); `hoverMode` remains Jump + Mode.
 
-### Phase 4 - Docs and validation
+### Phase 4 - Docs and release validation
 
-- README features/config table, a `JETPACK_IMPROVEMENTS.md` update if anything changes.
-- Test matrix + mixin export check.
+- [x] README features/config table and this analysis doc.
+- [ ] Real-pack client matrix, reobfuscated/CurseForge jar, mixin export/refmap check and release notes.
 
 ### File sketch
 
@@ -580,10 +580,16 @@ com/mrfuzzihead/ic2tweaks/jetpack/
   JetpackItem.java              (done, Phase 3: stock/electric/quantum access)
   JetpackParticles.java         (done, Phase 3)
   JetpackReadout.java           (done, Phase 3)
+  JetpackGuiState.java          (done, Phase 3: GUI pause state)
+  JetpackNetwork.java           (done, Phase 3: hover key packet channel)
+  ToggleHoverMessage.java       (done, Phase 3: client -> server hover toggle)
+  JetpackRefuelHandler.java     (done, Phase 3: biogas container refuel)
   client/JetpackRenderer.java   (done, Phase 2)
   client/ModelJetpack.java      (done, Phase 2)
   client/JetpackHudOverlay.java (done, Phase 3)
   client/JetpackTooltipHandler.java (done, Phase 3)
+  client/JetpackClientTick.java (done, Phase 3: GUI state)
+  client/JetpackKeyHandler.java (done, Phase 3: dedicated hover key)
   mixins/early/minecraft/MixinEntityPlayerArmorValue.java   (done, Phase 1)
   mixins/EarlyMixinsLoader.java                             (done, Phase 1)
   mixins/late/ic2/MixinItemArmorJetpack.java                (done, Phase 1)
@@ -598,8 +604,9 @@ src/main/resources/mixins.ic2tweaks.early.json         (done, Phase 1)
 src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   JetpackPhysicsTest.java       (done, Phase 0)
   JetpackConfigTest.java        (done, Phase 0)
-  JetpackRulesTest.java         (done, Phase 1)
+  JetpackRulesTest.java         (done, Phase 1/3: landing rules)
   JetpackReadoutTest.java       (done, Phase 3)
+  JetpackParticlesTest.java     (done, Phase 3)
 ```
 
 ### Server/client split (important)
@@ -652,19 +659,22 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   - when `tweakQuantumJetpack=true`, checks the quantum mixin, the chest-wins resolver and a real quantum
     hover drain (100 EU over 10 ticks);
   - charges a bauble-slot electric jetpack from a real chargepad tile and checks the gained EU;
+  - fills an empty gas jetpack from a real biogas cell (`gained=1000.0`);
   - ticks a real `EntityPlayer` with a filled gas jetpack in hover mode for 10 ticks and verifies the
     handler drained 10 mB and reset fall distance (`drained=10.0`, `fall=0.0` in the log).
 
-**Manual matrix (Phase 1+):**
+**Manual matrix (release):**
 
-- gas / electric x chest / TG cloak / TG shoulders / Baubles-Expanded cape/wings/belt / no slot mods.
-- hover on/off, boost held/not, low fuel, empty fuel, exact-1-unit boundary.
-- ground / air / water / lava / riding / creative flying / dead / respawn / dimension change / relog.
-- single-player, dedicated server, 200+ ms simulated latency (toggle + fuel display).
+- gas / electric / quantum chest x chest / TG cloak / TG shoulders / Baubles-Expanded cape/wings/belt /
+  no slot mods; chest-wins with a bauble and with GraviSuite.
+- hover on/off, boost, low/empty fuel, exact-1-unit boundary, landing assist, hover momentum, GUI pause and
+  the dedicated hover key in single-player and on a dedicated server with latency.
+- chargepad charging in Baubles and TravellersGear; biogas refill from a cell and a fluid container.
+- no Y ceiling at y>200; opt-in `altitudeFadeBlocks=25` still works.
 - with Hodgepodge 2.7.222 (must not conflict with `fixIc2ArmorLag`; quantum hover fix still applies when
   we do not replace the quantum), TravellersGear 1.16.x, Baubles-Expanded 2.2.27, GraviSuite 2.0.3.
-- Mixin export (`-Dmixin.debug.export=true`) to confirm the `onArmorTick` cancellation and the added
-  interfaces.
+- Mixin export (`-Dmixin.debug.export=true`) to confirm the `onArmorTick` cancellations, chargepad/quantum
+  injections and the added interfaces.
 
 ---
 
@@ -677,9 +687,9 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
 3. **Baubles slot type list**: **resolved** - default `cape,wings,body,belt`; legacy original Baubles falls back
    to the belt slot because the 1.7.10 `BaubleType` copies do not reliably expose `UNIVERSAL`.
 4. **TG slot**: **resolved** - default CLOAK (back), configurable to SHOULDERS/OFF.
-5. **Balance**: keep the gas/electric asymmetry or bring the electric jetpack up to gas endurance/lift?
-   Config defaults matter here. Open.
-6. **Quantum suit**: include it in v1 or defer? It is the same code and the same bugs, but it is a
-   tier-4 item with very different fuel numbers. Deferred to Phase 3.
+5. **Balance**: **resolved** - electric defaults now match gas lift/hover and use 4/2 EU/t (half gas
+   endurance, rechargeable). Old stock configs are migrated; partial custom values are preserved.
+6. **Quantum suit**: **resolved** - implemented as `tweakQuantumJetpack` (default off, restart required),
+   with its own 8/10 EU/t values and the stock jetpack-enable toggle preserved.
 7. **Sync strategy**: client simulation by default (`syncIntervalTicks=0`); a low-frequency authoritative
    sync is available for GUIs. Confirm in the manual latency test.

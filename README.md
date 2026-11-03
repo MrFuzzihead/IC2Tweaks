@@ -235,8 +235,8 @@ Both mirror IC2 Experimental 1.12.2's interfaces of the same name.
 ## Diagnostics
 
 Run `/ic2tweaks status` in-game to confirm the energy-net and wrench features are live, or
-`/ic2tweaks jetpack` for the jetpack config, the tick/HUD mixin markers and the stock/configured
-horizontal speeds. `status` reports:
+`/ic2tweaks jetpack` for the jetpack config, the tick/HUD/chargepad/quantum mixin markers and the
+stock/configured horizontal speeds. `status` reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
 - `wrench mixin active` — whether the wrench drop-rate mixin was applied, plus the `losslessWrench` value and its durability/EU costs
@@ -261,10 +261,12 @@ JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
 ```
 
 The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It also
-checks the pure jetpack physics, the jetpack/HUD mixin markers, and ticks a real `EntityPlayer` with a
-filled gas jetpack in hover mode to verify the handler drains fuel and resets fall distance, and (when
-Baubles is loaded) places a jetpack in a Baubles slot to verify the resolver. It is inactive unless the
-system property is set and is not part of normal gameplay.
+checks the pure jetpack physics, the jetpack/HUD/chargepad/quantum mixin markers, and ticks a real
+`EntityPlayer` with a filled gas jetpack in hover mode to verify the handler drains fuel and resets fall
+distance. With Baubles loaded it also verifies the slot resolver, charges a bauble-slot electric jetpack
+from a real chargepad tile and refills an empty gas jetpack from a real biogas cell; with
+`tweakQuantumJetpack=true` it checks the quantum mixin, chest-wins resolver and a real quantum hover
+drain. It is inactive unless the system property is set and is not part of normal gameplay.
 
 ```bash
 git clone https://github.com/MrFuzzihead/IC2Tweaks.git
