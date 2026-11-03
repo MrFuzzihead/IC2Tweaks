@@ -23,12 +23,13 @@ public final class JetpackParticles {
         }
 
         Random rand = player.worldObj.rand;
-        double yaw = Math.toRadians(player.rotationYaw);
-        // The player's look vector is (-sin(yaw), cos(yaw)); the nozzles sit behind and either side.
-        double backX = -Math.sin(yaw) * 0.35D;
-        double backZ = Math.cos(yaw) * 0.35D;
-        double sideX = Math.cos(yaw) * 0.18D;
-        double sideZ = Math.sin(yaw) * 0.18D;
+        // Use the body/render yaw: the backpack is attached to the torso, not the head. At yaw 0 the
+        // player faces +Z, so the look vector is (-sin(yaw), cos(yaw)) and the back is its negation.
+        double yaw = player.renderYawOffset;
+        double backX = backX(yaw, 0.45D);
+        double backZ = backZ(yaw, 0.45D);
+        double sideX = sideX(yaw, 0.18D);
+        double sideZ = sideZ(yaw, 0.18D);
         double baseY = player.boundingBox.minY + JetpackConfig.particleYOffset - (player.isSneaking() ? 0.15D : 0.0D);
         String particle = electric ? "flame" : (boost ? "largesmoke" : "smoke");
 
@@ -48,5 +49,25 @@ public final class JetpackParticles {
                     0.0D);
             }
         }
+    }
+
+    /** @return the X offset towards the player's back for a body yaw (0 faces +Z). */
+    static double backX(double yawDegrees, double distance) {
+        return Math.sin(Math.toRadians(yawDegrees)) * distance;
+    }
+
+    /** @return the Z offset towards the player's back for a body yaw (0 faces +Z). */
+    static double backZ(double yawDegrees, double distance) {
+        return -Math.cos(Math.toRadians(yawDegrees)) * distance;
+    }
+
+    /** @return the X offset towards the player's right for a body yaw (0 faces +Z). */
+    static double sideX(double yawDegrees, double distance) {
+        return Math.cos(Math.toRadians(yawDegrees)) * distance;
+    }
+
+    /** @return the Z offset towards the player's right for a body yaw (0 faces +Z). */
+    static double sideZ(double yawDegrees, double distance) {
+        return Math.sin(Math.toRadians(yawDegrees)) * distance;
     }
 }
