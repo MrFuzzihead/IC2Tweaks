@@ -443,7 +443,7 @@ allowInWater, allowInLava, creativeNoDrain, fallProtection,
 stripJetpackArmorDisplay
 hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
 hudShowSpeed, hudShowAltitude, hudLowFuelPercent
-tooltipsEnabled, particlesEnabled, particleIntervalTicks
+tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset
 baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
 slotFuelMultiplier, renderWornJetpack, syncIntervalTicks
 ```
@@ -510,7 +510,7 @@ mods.
   extended-inventory slot. Chest slot still wins; exactly one stack is ticked.
 - `JetpackRenderer` + `ModelJetpack` on `RenderPlayerEvent.Specials.Post`: a torso model offset behind the
   player, using IC2's `jetpack_1.png`; the chest slot is skipped (vanilla renders it). The renderer is
-  registered by reflection only on the client so no client class enters the server path.
+  registered by the client proxy (`ClientProxy`), so no client class enters the server path.
 - Dependencies: `Baubles-Expanded:2.2.27-GTNH:dev` for compile + dev runtime; TravellersGear's CurseForge
   jar is `compileOnly` because it is reobfuscated (production packs ship the real jar).
 - The canary now checks the Baubles mixin marker and drains a jetpack placed in a Baubles slot
@@ -529,12 +529,13 @@ mods.
   configurable interval and extra puffs on boost.
 - [ ] Optional quantum suit mixin and GraviSuite coexistence checks.
 
-Implementation: `JetpackHudOverlay` and `JetpackTooltipHandler` are client-only and registered by
-reflection from `IC2Tweaks.preInit`; `JetpackReadout` holds the pure percentage/speed/altitude maths and
+Implementation: `JetpackHudOverlay` and `JetpackTooltipHandler` are client-only and registered by the
+`@SidedProxy` client proxy (`ClientProxy`), which FML loads only on the physical client; `JetpackReadout`
+holds the pure percentage/speed/altitude maths and
 is unit-tested; `JetpackWorn.slotOf` supplies the tooltip's worn-slot line. The HUD reads the worn stack
 through `JetpackWorn`, so it works for the chest, Baubles-Expanded and TravellersGear slots. The
 `hudEnabled`/`hudCorner`/`hudShowSpeed`/`hudShowAltitude`/`hudLowFuelPercent`, `tooltipsEnabled` and
-`particlesEnabled`/`particleIntervalTicks` options are in the `jetpack` config category.
+`particlesEnabled`/`particleIntervalTicks`/`particleYOffset` options are in the `jetpack` config category.
 
 ### Phase 4 - Docs and validation
 
@@ -589,7 +590,7 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   only applied when the corresponding mod is present and the config is on (restart required).
 - The optional slot APIs stay out of the common resolver: `JetpackWorn` uses the `SlotProvider` hooks and
   `IC2Tweaks.preInit` only loads `BaublesCompat`/`TravellersGearCompat` when the mod is present. The
-  renderer is registered by reflection on the client only.
+  renderer is registered by the client proxy on the client only.
 - Vanilla classes such as `EntityPlayer` need an **early** mixin: the mod now has the
   `EarlyMixinsLoader` coremod and `mixins.ic2tweaks.early.json`. The early mixin is always applied and
   its runtime config check makes it inert when disabled.

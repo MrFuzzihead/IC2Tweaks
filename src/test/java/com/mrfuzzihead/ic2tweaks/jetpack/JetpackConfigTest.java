@@ -98,6 +98,7 @@ class JetpackConfigTest {
         assertTrue(JetpackConfig.tooltipsEnabled);
         assertTrue(JetpackConfig.particlesEnabled);
         assertEquals(2, JetpackConfig.particleIntervalTicks);
+        assertEquals(0.75F, JetpackConfig.particleYOffset, 1.0E-6F);
 
         assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
         assertEquals(TravellersGearSlot.CLOAK, JetpackConfig.travellersGearSlot);
@@ -144,6 +145,8 @@ class JetpackConfigTest {
             .set(false);
         configuration.get(JetpackConfig.CATEGORY, "particleIntervalTicks", "2")
             .set("5");
+        configuration.get(JetpackConfig.CATEGORY, "particleYOffset", "0.75")
+            .set("0.60");
         configuration.save();
 
         JetpackConfig.synchronizeConfiguration(currentFile);
@@ -164,6 +167,7 @@ class JetpackConfigTest {
         assertEquals(0, JetpackConfig.hudLowFuelPercent);
         assertFalse(JetpackConfig.particlesEnabled);
         assertEquals(5, JetpackConfig.particleIntervalTicks);
+        assertEquals(0.60F, JetpackConfig.particleYOffset, 1.0E-6F);
     }
 
     @Test

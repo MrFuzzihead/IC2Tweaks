@@ -178,6 +178,9 @@ public final class JetpackConfig {
     /** Ticks between exhaust particle emissions. 0 disables them (the same as particlesEnabled=false). */
     public static int particleIntervalTicks = 2;
 
+    /** Height above the player's feet at which exhaust particles spawn. Lower this if they look too high. */
+    public static float particleYOffset = 0.75F;
+
     // ---------------------------------------------------------------------------------------------
     // Slot integration
     // ---------------------------------------------------------------------------------------------
@@ -538,6 +541,15 @@ public final class JetpackConfig {
             0,
             20,
             "Ticks between exhaust particle emissions. 0 disables them.");
+
+        particleYOffset = configuration.getFloat(
+            "particleYOffset",
+            CATEGORY,
+            0.75F,
+            0.0F,
+            2.0F,
+            "Height above the player's feet at which exhaust particles spawn. Lower this if the particles "
+                + "look too high on the player model.");
 
         String rawBaubleSlotTypes = configuration.getString(
             "baubleSlotTypes",

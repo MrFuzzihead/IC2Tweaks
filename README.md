@@ -201,6 +201,7 @@ tooltips and particles are active):
 | `hudLowFuelPercent` | `10` | Fuel percentage at/below which the HUD warns; 0 disables the warning |
 | `tooltipsEnabled` | `true` | Add localized fuel/charge, mode, worn-slot and controls lines to the jetpack tooltip |
 | `particlesEnabled` / `particleIntervalTicks` | `true` / `2` | Exhaust particles while thrusting, and the ticks between emissions (0 disables) |
+| `particleYOffset` | `0.75` | Height above the player's feet where exhaust spawns; lower it if the particles look too high |
 | `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
 
 ## API

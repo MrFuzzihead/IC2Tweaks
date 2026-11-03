@@ -17,6 +17,7 @@ import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
@@ -34,6 +35,11 @@ public class IC2Tweaks {
     public static final String MODNAME = "IC2Tweaks";
     public static final String DEPENDENCIES = "required-after:IC2@2.2.828";
     public static final Logger LOG = LogManager.getLogger(MODID);
+
+    @SidedProxy(
+        clientSide = "com.mrfuzzihead.ic2tweaks.client.ClientProxy",
+        serverSide = "com.mrfuzzihead.ic2tweaks.CommonProxy")
+    public static CommonProxy proxy;
 
     private final EnetConductorRegistry conductorRegistry = new EnetConductorRegistry();
     private final EnetCableEffects cableEffects = new EnetCableEffects(conductorRegistry);
@@ -77,14 +83,9 @@ public class IC2Tweaks {
         if (Loader.isModLoaded("TravellersGear")) {
             JetpackWorn.registerTravellersGear(new com.mrfuzzihead.ic2tweaks.jetpack.compat.TravellersGearCompat());
         }
-        if (FMLCommonHandler.instance()
-            .getSide()
-            .isClient()) {
-            // Reflection keeps client-only classes out of the server class-loading path.
-            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackRenderer");
-            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackHudOverlay");
-            registerClientHandler("com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackTooltipHandler");
-        }
+        // The proxy is selected by FML: the client registers the renderer/HUD/tooltip handlers; the
+        // dedicated server never loads those classes.
+        proxy.preInit(event);
 
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the
         // registry keeps track of the conductors IC2 has loaded.
@@ -109,17 +110,6 @@ public class IC2Tweaks {
         // Optional Waila integration: Waila reflects into the named method and passes its registrar.
         // The message is harmless when Waila is absent, and the compat class is only loaded by Waila.
         FMLInterModComms.sendMessage("Waila", "register", WailaIntegrationState.REGISTRATION_METHOD);
-    }
-
-    private static void registerClientHandler(String className) {
-        try {
-            Object handler = Class.forName(className)
-                .getConstructor()
-                .newInstance();
-            MinecraftForge.EVENT_BUS.register(handler);
-        } catch (ReflectiveOperationException e) {
-            LOG.warn("Could not register " + className, e);
-        }
     }
 
     @Mod.EventHandler

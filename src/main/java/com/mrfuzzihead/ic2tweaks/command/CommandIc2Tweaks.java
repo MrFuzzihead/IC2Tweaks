@@ -238,7 +238,8 @@ public class CommandIc2Tweaks extends CommandBase {
                 + JetpackConfig.particlesEnabled
                 + " every "
                 + JetpackConfig.particleIntervalTicks
-                + "t");
+                + "t at Y+"
+                + String.format(Locale.ROOT, "%.2f", JetpackConfig.particleYOffset));
     }
 
     private static double stockSpeed(Mode mode, Kind kind, double power) {

@@ -29,14 +29,14 @@ public final class JetpackParticles {
         double backZ = Math.cos(yaw) * 0.35D;
         double sideX = Math.cos(yaw) * 0.18D;
         double sideZ = Math.sin(yaw) * 0.18D;
-        double baseY = player.posY + (player.isSneaking() ? 0.95D : 1.10D);
+        double baseY = player.boundingBox.minY + JetpackConfig.particleYOffset - (player.isSneaking() ? 0.15D : 0.0D);
         String particle = electric ? "flame" : (boost ? "largesmoke" : "smoke");
 
         for (int side = -1; side <= 1; side += 2) {
             double x = player.posX + backX + sideX * side + (rand.nextDouble() - 0.5D) * 0.06D;
-            double y = baseY + (rand.nextDouble() - 0.5D) * 0.08D;
+            double y = baseY + (rand.nextDouble() - 0.5D) * 0.06D;
             double z = player.posZ + backZ + sideZ * side + (rand.nextDouble() - 0.5D) * 0.06D;
-            player.worldObj.spawnParticle(particle, x, y, z, 0.0D, -0.02D - rand.nextDouble() * 0.02D, 0.0D);
+            player.worldObj.spawnParticle(particle, x, y, z, 0.0D, -0.05D - rand.nextDouble() * 0.03D, 0.0D);
             if (boost) {
                 player.worldObj.spawnParticle(
                     particle,
@@ -44,7 +44,7 @@ public final class JetpackParticles {
                     y - 0.04D,
                     z + (rand.nextDouble() - 0.5D) * 0.04D,
                     0.0D,
-                    -0.04D,
+                    -0.08D,
                     0.0D);
             }
         }

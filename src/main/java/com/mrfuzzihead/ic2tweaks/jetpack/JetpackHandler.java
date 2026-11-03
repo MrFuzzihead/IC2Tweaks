@@ -1,5 +1,7 @@
 package com.mrfuzzihead.ic2tweaks.jetpack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -255,9 +257,12 @@ public final class JetpackHandler {
     }
 
     private static void stopAll(Map<EntityPlayer, JetpackState> states) {
-        for (JetpackState state : states.values()) {
+        // Snapshot and clear before stopping: audio/world teardown can otherwise mutate the WeakHashMap
+        // (or let GC expunge weak keys) while we are iterating it, which crashed on world unload.
+        List<JetpackState> snapshot = new ArrayList<>(states.values());
+        states.clear();
+        for (JetpackState state : snapshot) {
             state.stopAudio();
         }
-        states.clear();
     }
 }
