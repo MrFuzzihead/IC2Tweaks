@@ -7,6 +7,7 @@ import java.util.WeakHashMap;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.MathHelper;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.event.world.WorldEvent;
 
@@ -65,6 +66,12 @@ public final class JetpackHandler {
             player.extinguish();
         }
 
+        if (JetpackConfig.pauseInGui && JetpackGuiState.guiOpen) {
+            state.stopAudio();
+            state.thrusting = false;
+            return;
+        }
+
         if (!JetpackRules.canOperate(
             player.isDead,
             player.isRiding(),
@@ -91,10 +98,15 @@ public final class JetpackHandler {
         }
         if (quantum) {
             // The quantum chest's stock chest tick is cancelled, so the handler owns both toggles.
-            state.hoverMode = stack.hasTagCompound() && stack.getTagCompound()
-                .getBoolean("hoverMode");
             state.jetpackEnabled = stack.hasTagCompound() && stack.getTagCompound()
                 .getBoolean("jetpack");
+        }
+        // External toggles (dedicated key / stock IC2 combo / a server NBT sync) must be picked up even
+        // when the stack object itself did not change.
+        if (quantum || stack.hasTagCompound() && stack.getTagCompound()
+            .hasKey("hoverMode")) {
+            state.hoverMode = stack.hasTagCompound() && stack.getTagCompound()
+                .getBoolean("hoverMode");
         }
 
         if (state.toggleCooldown > 0) {
@@ -154,6 +166,25 @@ public final class JetpackHandler {
             state.stopAudio();
             state.thrusting = false;
             return;
+        }
+
+        // Soft landing: brake a fall near the ground even when the player is not holding jump. This runs
+        // before the engaged check so it also helps a player who is simply falling with a charged jetpack.
+        if (JetpackConfig.landingAssist && JetpackRules.shouldLandingAssist(
+            player.motionY,
+            player.onGround,
+            player.capabilities.isFlying,
+            player.isRiding(),
+            player.isInWater(),
+            player.handleLavaMovement())) {
+            int groundY = player.worldObj
+                .getHeightValue(MathHelper.floor_double(player.posX), MathHelper.floor_double(player.posZ));
+            if (JetpackRules.withinLandingRange(player.posY, groundY, JetpackConfig.landingAssistDistance)) {
+                if (client) {
+                    player.motionY = Math.max(player.motionY, -JetpackConfig.landingAssistSpeed);
+                }
+                player.fallDistance = 0.0F;
+            }
         }
 
         // Optional safety net: a charged jetpack keeps resetting fall distance even when not thrusting.
@@ -246,13 +277,15 @@ public final class JetpackHandler {
                 JetpackConfig.ascentSpeed * speedBoost,
                 JetpackConfig.hoverRise * hoverScale * speedBoost,
                 JetpackConfig.hoverSink * hoverScale,
-                JetpackConfig.hoverIdle);
+                JetpackConfig.hoverIdle,
+                JetpackConfig.hoverMomentum);
             player.motionX = state.motion.x;
             player.motionY = state.motion.y;
             player.motionZ = state.motion.z;
         }
 
         player.fallDistance = 0.0F;
+        // Intentionally suppresses footsteps and movement-stat/exhaustion effects while thrusting (B19).
         player.distanceWalkedModified = 0.0F;
         IC2.platform.resetPlayerInAirTime(player);
 

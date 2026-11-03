@@ -71,19 +71,19 @@ class JetpackConfigTest {
         assertEquals(0.20F, JetpackConfig.hoverRise, 1.0E-6F);
         assertEquals(0.20F, JetpackConfig.hoverSink, 1.0E-6F);
         assertEquals(0.0F, JetpackConfig.hoverIdle, 1.0E-6F);
-        assertEquals(0.50F, JetpackConfig.electricHoverFactor, 1.0E-6F);
-        assertEquals(0.70F, JetpackConfig.electricPowerFactor, 1.0E-6F);
+        assertEquals(1.0F, JetpackConfig.electricHoverFactor, 1.0E-6F);
+        assertEquals(1.0F, JetpackConfig.electricPowerFactor, 1.0E-6F);
 
         assertEquals(2, JetpackConfig.gasFuelPerTick);
         assertEquals(1, JetpackConfig.gasHoverFuelPerTick);
-        assertEquals(8, JetpackConfig.electricEuPerTick);
-        assertEquals(7, JetpackConfig.electricHoverEuPerTick);
+        assertEquals(4, JetpackConfig.electricEuPerTick);
+        assertEquals(2, JetpackConfig.electricHoverEuPerTick);
         assertEquals(8, JetpackConfig.quantumEuPerTick);
         assertEquals(10, JetpackConfig.quantumHoverEuPerTick);
         assertEquals(0.20F, JetpackConfig.gasLowFuelThreshold, 1.0E-6F);
         assertEquals(0.05F, JetpackConfig.electricLowFuelThreshold, 1.0E-6F);
 
-        assertEquals(25, JetpackConfig.altitudeFadeBlocks);
+        assertEquals(0, JetpackConfig.altitudeFadeBlocks);
         assertEquals(1.28F, JetpackConfig.electricAltitudeFactor, 1.0E-6F);
 
         assertFalse(JetpackConfig.allowInWater);
@@ -101,6 +101,13 @@ class JetpackConfigTest {
         assertTrue(JetpackConfig.particlesEnabled);
         assertEquals(2, JetpackConfig.particleIntervalTicks);
         assertTrue(JetpackConfig.chargepadChargesBaubles);
+        assertTrue(JetpackConfig.landingAssist);
+        assertEquals(3.0F, JetpackConfig.landingAssistDistance, 1.0E-6F);
+        assertEquals(0.08F, JetpackConfig.landingAssistSpeed, 1.0E-6F);
+        assertEquals(0.0F, JetpackConfig.hoverMomentum, 1.0E-6F);
+        assertFalse(JetpackConfig.pauseInGui);
+        assertTrue(JetpackConfig.dedicatedHoverKey);
+        assertTrue(JetpackConfig.easyGasRefuel);
         assertEquals(0.75F, JetpackConfig.particleYOffset, 1.0E-6F);
 
         assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
@@ -183,6 +190,22 @@ class JetpackConfigTest {
     }
 
     @Test
+    void oldStockElectricAndAltitudeDefaultsMigrateToTheBalancedNoCeilingValues() {
+        setString("electricEuPerTick", "8");
+        setString("electricHoverEuPerTick", "7");
+        setString("electricPowerFactor", "0.7");
+        setString("electricHoverFactor", "0.5");
+        setString("altitudeFadeBlocks", "25");
+        JetpackConfig.synchronizeConfiguration(currentFile);
+
+        assertEquals(4, JetpackConfig.electricEuPerTick);
+        assertEquals(2, JetpackConfig.electricHoverEuPerTick);
+        assertEquals(1.0F, JetpackConfig.electricPowerFactor, 1.0E-6F);
+        assertEquals(1.0F, JetpackConfig.electricHoverFactor, 1.0E-6F);
+        assertEquals(0, JetpackConfig.altitudeFadeBlocks);
+    }
+
+    @Test
     void hudCornerParsingFallsBackToTopLeft() {
         assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.HudCorner.fromString(null));
         assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.HudCorner.fromString("banana"));
@@ -246,7 +269,7 @@ class JetpackConfigTest {
         setString("electricEuPerTick", "99999");
         setString("electricPowerFactor", "99");
         setString("hoverIdle", "5");
-        setString("altitudeFadeBlocks", "0");
+        setString("altitudeFadeBlocks", "-5");
         setString("syncIntervalTicks", "5000");
         setString("slotFuelMultiplier", "0");
         JetpackConfig.synchronizeConfiguration(currentFile);
@@ -256,7 +279,7 @@ class JetpackConfigTest {
         assertEquals(10000, JetpackConfig.electricEuPerTick);
         assertEquals(2.0F, JetpackConfig.electricPowerFactor, 1.0E-6F);
         assertEquals(0.2F, JetpackConfig.hoverIdle, 1.0E-6F);
-        assertEquals(1, JetpackConfig.altitudeFadeBlocks);
+        assertEquals(0, JetpackConfig.altitudeFadeBlocks);
         assertEquals(1200, JetpackConfig.syncIntervalTicks);
         assertEquals(0.1F, JetpackConfig.slotFuelMultiplier, 1.0E-6F);
     }

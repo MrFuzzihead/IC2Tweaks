@@ -35,7 +35,9 @@ that changes to IC2 itself can be shipped and versioned independently.
   slots or the TravellersGear cloak/shoulder slot, with a rendered backpack. Phase 3 adds a compact
   fuel/mode/speed/altitude HUD, localized fuel/mode/slot/controls tooltips, exhaust particles, chargepad
   support for bauble/TG electric jetpacks, and optional quantum-chest integration. A chest jetpack always
-  wins over a bauble/TG jetpack; see `JETPACK_IMPROVEMENTS.md`.
+  wins over a bauble/TG jetpack. The flight pass also removes the arbitrary Y ceiling, adds soft-landing
+  assist, a dedicated hover key, easier gas refuelling and balanced electric defaults; see
+  `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
   (BatBox, CESU, MFE, MFSU, chargepads and addon storage) and for ordinary `TileEntityElectricMachine`
@@ -186,12 +188,12 @@ tooltips and particles are active):
 | `boostMultiplier` / `boostFuelMultiplier` | `1.6` / `2.5` | IC2 boost-key speed and fuel multipliers |
 | `ascentSpeed` | `0.6` | Maximum normal ascent speed in blocks/tick (stock IC2 is 0.6 b/t) |
 | `hoverRise` / `hoverSink` / `hoverIdle` | `0.2` / `0.2` / `0.0` | Hover-mode vertical speeds in blocks/tick |
-| `electricHoverFactor` | `0.5` | Scales the electric jetpack's hover speeds (stock 0.1 instead of 0.2) |
-| `electricPowerFactor` | `0.7` | Normal-mode lift/horizontal multiplier for the electric jetpack (stock 0.7; set 1.0 for gas parity) |
+| `electricHoverFactor` | `1.0` | Scales the electric jetpack's hover speeds; balanced parity with gas (stock 0.5) |
+| `electricPowerFactor` | `1.0` | Normal-mode lift/horizontal multiplier; balanced parity with gas (stock 0.7) |
 | `gasFuelPerTick` / `gasHoverFuelPerTick` | `2` / `1` | Biogas mB/tick in normal/hover mode |
-| `electricEuPerTick` / `electricHoverEuPerTick` | `8` / `7` | EU/tick for the electric jetpack in normal/hover mode |
+| `electricEuPerTick` / `electricHoverEuPerTick` | `4` / `2` | Balanced EU/tick for the electric jetpack (stock 8/7); half gas endurance but rechargeable |
 | `quantumEuPerTick` / `quantumHoverEuPerTick` | `8` / `10` | EU/tick for the integrated quantum chest in normal/hover mode |
-| `altitudeFadeBlocks` / `electricAltitudeFactor` | `25` / `1.28` | Altitude fade length and electric ceiling divisor |
+| `altitudeFadeBlocks` / `electricAltitudeFactor` | `0` / `1.28` | `0` removes the arbitrary Y ceiling; set 25 for IC2's stock fade/ceiling |
 | `baubleSlotTypes` | `cape,wings,body,belt` | Comma-separated Baubles slot types (cape/wings/body require Baubles-Expanded; belt works with original Baubles); `OFF` disables. The old `cape,body,belt` default is migrated to include wings. Requires a restart |
 | `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
 | `tweakQuantumJetpack` | `false` | Drive the quantum chest with the new controller (8/10 EU/t, same movement/HUD/particles). Requires a restart |
@@ -206,7 +208,17 @@ tooltips and particles are active):
 | `tooltipsEnabled` | `true` | Add localized fuel/charge, mode, worn-slot and controls lines to the jetpack tooltip |
 | `particlesEnabled` / `particleIntervalTicks` | `true` / `2` | Exhaust particles while thrusting, and the ticks between emissions (0 disables) |
 | `particleYOffset` | `0.75` | Height above the player's feet where exhaust spawns; lower it if the particles look too high |
+| `landingAssist` | `true` | Soft-landing braking near the ground when falling with a charged jetpack |
+| `landingAssistDistance` / `landingAssistSpeed` | `3.0` / `0.08` | Start height and maximum sink speed for landing assist |
+| `hoverMomentum` | `0.0` | Upward hover velocity carried after releasing jump; 0 stops immediately |
+| `pauseInGui` | `false` | Stop jetpack thrust/hover while a GUI is open (client-side pause) |
+| `dedicatedHoverKey` | `true` | Enable the dedicated hover key (default H, configurable in Controls) |
+| `easyGasRefuel` | `true` | Right-click a biogas container to refill a worn gas jetpack |
 | `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
+
+Old configs that still contain IC2's stock electric quartet (`8`/`7`/`0.7`/`0.5`) and
+`altitudeFadeBlocks=25` are migrated to the balanced/no-ceiling defaults on load. Partially customised
+values are left untouched.
 
 ## API
 

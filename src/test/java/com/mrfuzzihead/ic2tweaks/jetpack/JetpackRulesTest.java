@@ -34,6 +34,26 @@ class JetpackRulesTest {
     }
 
     @Test
+    void landingAssistOnlyAppliesToAFallingPlayer() {
+        assertTrue(JetpackRules.shouldLandingAssist(-0.1D, false, false, false, false, false));
+        assertFalse(JetpackRules.shouldLandingAssist(0.1D, false, false, false, false, false));
+        assertFalse(JetpackRules.shouldLandingAssist(-0.1D, true, false, false, false, false));
+        assertFalse(JetpackRules.shouldLandingAssist(-0.1D, false, true, false, false, false));
+        assertFalse(JetpackRules.shouldLandingAssist(-0.1D, false, false, true, false, false));
+        assertFalse(JetpackRules.shouldLandingAssist(-0.1D, false, false, false, true, false));
+        assertFalse(JetpackRules.shouldLandingAssist(-0.1D, false, false, false, false, true));
+    }
+
+    @Test
+    void landingRangeIsBounded() {
+        assertTrue(JetpackRules.withinLandingRange(10.0D, 8, 3.0D));
+        assertTrue(JetpackRules.withinLandingRange(8.0D, 8, 3.0D));
+        assertFalse(JetpackRules.withinLandingRange(10.0D, 8, 1.0D));
+        assertFalse(JetpackRules.withinLandingRange(7.0D, 8, 3.0D));
+        assertFalse(JetpackRules.withinLandingRange(10.0D, 8, -1.0D));
+    }
+
+    @Test
     void fuelIsCheckedBeforeThrust() {
         assertTrue(JetpackRules.canConsume(10.0D, 2));
         assertTrue(JetpackRules.canConsume(2.0D, 2));

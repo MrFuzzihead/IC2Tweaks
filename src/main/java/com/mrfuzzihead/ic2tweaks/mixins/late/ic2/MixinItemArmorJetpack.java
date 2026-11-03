@@ -1,6 +1,8 @@
 package com.mrfuzzihead.ic2tweaks.mixins.late.ic2;
 
+import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
@@ -45,6 +47,24 @@ public abstract class MixinItemArmorJetpack {
         if (milliBuckets > 0) {
             ((ItemArmorJetpack) (Object) this).drain(stack, milliBuckets, true);
         }
+        ci.cancel();
+    }
+
+    /** Use the actual item instance for creative sub-items so addon subclasses no longer expose gas items. */
+    @Inject(method = "getSubItems", at = @At("HEAD"), cancellable = true)
+    private void ic2tweaks$creativeItemsUseThisItem(Item item, CreativeTabs tab, java.util.List<ItemStack> list,
+        CallbackInfo ci) {
+        if (!JetpackConfig.enabled) {
+            return;
+        }
+        ItemArmorJetpack jetpack = (ItemArmorJetpack) (Object) this;
+        ItemStack filled = new ItemStack((Item) (Object) this, 1);
+        jetpack.filltank(filled);
+        filled.setItemDamage(1);
+        list.add(filled);
+        ItemStack empty = new ItemStack((Item) (Object) this, 1);
+        empty.setItemDamage(jetpack.getMaxDamage());
+        list.add(empty);
         ci.cancel();
     }
 

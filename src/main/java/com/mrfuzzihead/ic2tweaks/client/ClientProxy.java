@@ -3,10 +3,13 @@ package com.mrfuzzihead.ic2tweaks.client;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.mrfuzzihead.ic2tweaks.CommonProxy;
+import com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackClientTick;
 import com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackHudOverlay;
+import com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackKeyHandler;
 import com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackRenderer;
 import com.mrfuzzihead.ic2tweaks.jetpack.client.JetpackTooltipHandler;
 
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
 /**
@@ -21,5 +24,11 @@ public class ClientProxy extends CommonProxy {
         MinecraftForge.EVENT_BUS.register(new JetpackRenderer());
         MinecraftForge.EVENT_BUS.register(new JetpackHudOverlay());
         MinecraftForge.EVENT_BUS.register(new JetpackTooltipHandler());
+        FMLCommonHandler.instance()
+            .bus()
+            .register(new JetpackClientTick());
+        FMLCommonHandler.instance()
+            .bus()
+            .register(new JetpackKeyHandler());
     }
 }

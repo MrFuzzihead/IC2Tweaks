@@ -16,6 +16,7 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 import com.mojang.authlib.GameProfile;
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
@@ -26,6 +27,7 @@ import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Kind;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Motion;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRefuelHandler;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRules;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
@@ -78,6 +80,10 @@ public final class CanaryHarness {
     private ItemStack chargepadStack;
     private double chargepadChargeBefore;
     private double chargepadChargeAfter;
+    private EntityPlayer refuelPlayer;
+    private ItemStack refuelStack;
+    private double refuelChargeBefore;
+    private double refuelChargeAfter;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -188,6 +194,35 @@ public final class CanaryHarness {
         buildTravellersGearProbe();
         buildQuantumProbe();
         buildChargepadProbe();
+        buildRefuelProbe();
+    }
+
+    private void buildRefuelProbe() {
+        if (!JetpackConfig.easyGasRefuel) {
+            return;
+        }
+        try {
+            refuelPlayer = makePlayer("ic2tweaks_refuel");
+            refuelStack = new ItemStack(Ic2Items.jetpack.getItem(), 1);
+            refuelPlayer.inventory.armorInventory[2] = refuelStack;
+            ItemStack cell = Ic2Items.biogasCell.copy();
+            refuelPlayer.inventory.mainInventory[0] = cell;
+            refuelPlayer.inventory.currentItem = 0;
+            refuelChargeBefore = JetpackItem.charge(refuelStack);
+            PlayerInteractEvent event = new PlayerInteractEvent(
+                refuelPlayer,
+                PlayerInteractEvent.Action.RIGHT_CLICK_AIR,
+                0,
+                0,
+                0,
+                0,
+                world);
+            new JetpackRefuelHandler().onPlayerInteract(event);
+            refuelChargeAfter = JetpackItem.charge(refuelStack);
+        } catch (Exception e) {
+            failures.add("refuel probe: " + e);
+            IC2Tweaks.LOG.error("[canary] refuel probe failed", e);
+        }
     }
 
     private void buildChargepadProbe() {
@@ -576,6 +611,10 @@ public final class CanaryHarness {
                 "jetpack travellersgear mixin applied",
                 hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied"),
                 "TravellersGear");
+        }
+        if (refuelPlayer != null) {
+            double gained = refuelChargeAfter - refuelChargeBefore;
+            check("easy gas refuel fills a worn jetpack", gained > 0.0D, "gained=" + gained);
         }
         if (chargepadPlayer != null) {
             double gained = chargepadChargeAfter - chargepadChargeBefore;

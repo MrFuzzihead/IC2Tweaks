@@ -106,6 +106,9 @@ public final class JetpackTooltipHandler {
 
         event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.1"));
         event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.2"));
+        if (JetpackConfig.dedicatedHoverKey) {
+            event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.3"));
+        }
         if (quantum) {
             event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.quantum"));
         }

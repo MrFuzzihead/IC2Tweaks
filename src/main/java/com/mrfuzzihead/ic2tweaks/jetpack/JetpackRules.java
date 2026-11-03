@@ -39,4 +39,16 @@ public final class JetpackRules {
     public static boolean canConsume(double charge, int cost) {
         return cost <= 0 || charge >= cost;
     }
+
+    /** @return whether a falling player is eligible for the soft-landing assist. */
+    public static boolean shouldLandingAssist(double motionY, boolean onGround, boolean creativeFlying, boolean riding,
+        boolean inWater, boolean inLava) {
+        return motionY < 0.0D && !onGround && !creativeFlying && !riding && !inWater && !inLava;
+    }
+
+    /** @return whether the player is within {@code distance} blocks above the ground. */
+    public static boolean withinLandingRange(double posY, int groundY, double distance) {
+        double above = posY - groundY;
+        return above >= 0.0D && above <= Math.max(0.0D, distance);
+    }
 }

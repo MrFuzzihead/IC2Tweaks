@@ -77,16 +77,16 @@ public final class JetpackConfig {
     public static float hoverIdle = 0.0F;
 
     /**
-     * Scales {@link #hoverRise} and {@link #hoverSink} for the electric jetpack. IC2's stock electric
-     * jetpack uses 0.1 instead of 0.2, so the default 0.5 preserves that.
+     * Scales {@link #hoverRise} and {@link #hoverSink} for the electric jetpack. The balanced default is
+     * 1.0 so the electric jetpack hovers at the same speed as gas; set 0.5 for IC2's stock 0.1 hover speed.
      */
-    public static float electricHoverFactor = 0.5F;
+    public static float electricHoverFactor = 1.0F;
 
     /**
-     * Normal-mode lift/horizontal multiplier for the electric jetpack. IC2's stock value is 0.7; the hover
-     * rise/sink are scaled separately by {@link #electricHoverFactor}.
+     * Normal-mode lift/horizontal multiplier for the electric jetpack. The balanced default is 1.0 (gas
+     * parity); set 0.7 for IC2's stock electric lift.
      */
-    public static float electricPowerFactor = 0.7F;
+    public static float electricPowerFactor = 1.0F;
 
     // ---------------------------------------------------------------------------------------------
     // Fuel / energy
@@ -98,11 +98,17 @@ public final class JetpackConfig {
     /** Biogas consumed per tick by the gas jetpack in hover mode. IC2's stock value is 1 mB/t. */
     public static int gasHoverFuelPerTick = 1;
 
-    /** EU consumed per tick by the electric jetpack in normal mode. IC2's stock value is 8 EU/t. */
-    public static int electricEuPerTick = 8;
+    /**
+     * EU consumed per tick by the electric jetpack in normal mode. The balanced default is 4 EU/t (half
+     * the gas endurance, but the electric jetpack is rechargeable); IC2's stock value is 8.
+     */
+    public static int electricEuPerTick = 4;
 
-    /** EU consumed per tick by the electric jetpack in hover mode. IC2's stock value is 7 EU/t. */
-    public static int electricHoverEuPerTick = 7;
+    /**
+     * EU consumed per tick by the electric jetpack in hover mode. The balanced default is 2 EU/t; IC2's
+     * stock value is 7.
+     */
+    public static int electricHoverEuPerTick = 2;
 
     /** EU consumed per tick by the quantum chest in normal mode. IC2's stock value is 8 EU/t. */
     public static int quantumEuPerTick = 8;
@@ -120,12 +126,16 @@ public final class JetpackConfig {
     // Altitude
     // ---------------------------------------------------------------------------------------------
 
-    /** Number of blocks over which lift fades out below the ceiling. IC2's stock value is 25. */
-    public static int altitudeFadeBlocks = 25;
+    /**
+     * Number of blocks over which lift fades out below the ceiling. 0 (the default) disables the fade and
+     * the arbitrary electric ceiling entirely; set 25 for IC2's stock fade.
+     */
+    public static int altitudeFadeBlocks = 0;
 
     /**
-     * The electric jetpack's ceiling is {@code worldHeight / electricAltitudeFactor}. IC2's stock value is
-     * 1.28, which gives y=200 in a 256-high world.
+     * The electric jetpack's ceiling is {@code worldHeight / electricAltitudeFactor} when
+     * {@link #altitudeFadeBlocks} is positive. IC2's stock value is 1.28, which gives y=200 in a 256-high
+     * world; it is inert while the fade is disabled.
      */
     public static float electricAltitudeFactor = 1.28F;
 
@@ -186,6 +196,27 @@ public final class JetpackConfig {
 
     /** Ticks between exhaust particle emissions. 0 disables them (the same as particlesEnabled=false). */
     public static int particleIntervalTicks = 2;
+
+    /** Enable a soft landing when falling near the ground with a charged jetpack. */
+    public static boolean landingAssist = true;
+
+    /** Height above the ground at which landing assist starts, in blocks. */
+    public static float landingAssistDistance = 3.0F;
+
+    /** Maximum downward speed while landing assist is active, in blocks per tick. */
+    public static float landingAssistSpeed = 0.08F;
+
+    /** How much upward hover velocity carries over after releasing jump. 0 stops immediately. */
+    public static float hoverMomentum = 0.0F;
+
+    /** Stop jetpack thrust (including hover) while a GUI is open. Client-side pause. */
+    public static boolean pauseInGui = false;
+
+    /** Enable the dedicated hover key binding (default H, configurable in Controls). */
+    public static boolean dedicatedHoverKey = true;
+
+    /** Right-click a biogas container to refill a worn gas jetpack. */
+    public static boolean easyGasRefuel = true;
 
     /** Height above the player's feet at which exhaust particles spawn. Lower this if they look too high. */
     public static float particleYOffset = 0.75F;
@@ -393,21 +424,20 @@ public final class JetpackConfig {
         electricHoverFactor = configuration.getFloat(
             "electricHoverFactor",
             CATEGORY,
-            0.50F,
+            1.0F,
             0.0F,
             1.0F,
-            "Scales hoverRise and hoverSink for the electric jetpack. IC2's stock electric jetpack uses 0.1 "
-                + "instead of 0.2, so the default 0.5 preserves that.");
+            "Scales hoverRise and hoverSink for the electric jetpack. The balanced default 1.0 matches gas; "
+                + "set 0.5 for IC2's stock electric hover speed.");
 
         electricPowerFactor = configuration.getFloat(
             "electricPowerFactor",
             CATEGORY,
-            0.70F,
+            1.0F,
             0.0F,
             2.0F,
-            "Normal-mode lift/horizontal multiplier for the electric jetpack. IC2's stock value is 0.7; the "
-                + "hover speeds are scaled separately by electricHoverFactor. Set 1.0 to make the electric "
-                + "jetpack lift like the gas one.");
+            "Normal-mode lift/horizontal multiplier for the electric jetpack. The balanced default 1.0 gives "
+                + "gas parity; set 0.7 for IC2's stock electric lift.");
 
         gasFuelPerTick = configuration.getInt(
             "gasFuelPerTick",
@@ -428,18 +458,20 @@ public final class JetpackConfig {
         electricEuPerTick = configuration.getInt(
             "electricEuPerTick",
             CATEGORY,
-            8,
+            4,
             0,
             10000,
-            "EU consumed per tick by the electric jetpack in normal mode. IC2's stock value is 8 EU/t.");
+            "EU consumed per tick by the electric jetpack in normal mode. The balanced default is 4 EU/t; "
+                + "IC2's stock value is 8.");
 
         electricHoverEuPerTick = configuration.getInt(
             "electricHoverEuPerTick",
             CATEGORY,
-            7,
+            2,
             0,
             10000,
-            "EU consumed per tick by the electric jetpack in hover mode. IC2's stock value is 7 EU/t.");
+            "EU consumed per tick by the electric jetpack in hover mode. The balanced default is 2 EU/t; "
+                + "IC2's stock value is 7.");
 
         quantumEuPerTick = configuration.getInt(
             "quantumEuPerTick",
@@ -476,10 +508,11 @@ public final class JetpackConfig {
         altitudeFadeBlocks = configuration.getInt(
             "altitudeFadeBlocks",
             CATEGORY,
-            25,
-            1,
+            0,
+            0,
             256,
-            "Number of blocks over which lift fades out below the ceiling. IC2's stock value is 25.");
+            "Number of blocks over which lift fades out below the ceiling. 0 (default) removes the arbitrary "
+                + "ceiling; set 25 for IC2's stock fade.");
 
         electricAltitudeFactor = configuration.getFloat(
             "electricAltitudeFactor",
@@ -574,6 +607,56 @@ public final class JetpackConfig {
             20,
             "Ticks between exhaust particle emissions. 0 disables them.");
 
+        landingAssist = configuration.getBoolean(
+            "landingAssist",
+            CATEGORY,
+            true,
+            "Enable a soft landing when falling near the ground with a charged jetpack.");
+
+        landingAssistDistance = configuration.getFloat(
+            "landingAssistDistance",
+            CATEGORY,
+            3.0F,
+            0.5F,
+            16.0F,
+            "Height above the ground at which landing assist starts, in blocks.");
+
+        landingAssistSpeed = configuration.getFloat(
+            "landingAssistSpeed",
+            CATEGORY,
+            0.08F,
+            0.01F,
+            0.5F,
+            "Maximum downward speed while landing assist is active, in blocks per tick.");
+
+        hoverMomentum = configuration.getFloat(
+            "hoverMomentum",
+            CATEGORY,
+            0.0F,
+            0.0F,
+            1.0F,
+            "How much upward hover velocity carries over after releasing jump. 0 stops immediately; 1 "
+                + "preserves the old floaty behaviour.");
+
+        pauseInGui = configuration.getBoolean(
+            "pauseInGui",
+            CATEGORY,
+            false,
+            "Stop jetpack thrust (including hover) while a GUI is open. This is a client-side pause; the "
+                + "server may still simulate fuel when syncIntervalTicks is 0.");
+
+        dedicatedHoverKey = configuration.getBoolean(
+            "dedicatedHoverKey",
+            CATEGORY,
+            true,
+            "Enable the dedicated hover key binding (default H, configurable in Controls).");
+
+        easyGasRefuel = configuration.getBoolean(
+            "easyGasRefuel",
+            CATEGORY,
+            true,
+            "Right-click a biogas container to refill a worn gas jetpack.");
+
         particleYOffset = configuration.getFloat(
             "particleYOffset",
             CATEGORY,
@@ -633,6 +716,31 @@ public final class JetpackConfig {
             "Server-to-client fuel/charge sync interval in ticks. 0 means never: both sides simulate the "
                 + "consumption (IC2 and Hodgepodge's fixIc2ArmorLag already work this way). Set a positive "
                 + "value to periodically re-sync the authoritative stack for GUIs.");
+
+        // Migrate the old stock defaults to the balanced/no-ceiling defaults. A user who deliberately
+        // kept the full stock quartet (8/7/0.7/0.5) gets the new balance; partial tuning is preserved.
+        boolean legacyElectric = electricEuPerTick == 8 && electricHoverEuPerTick == 7
+            && Math.abs(electricPowerFactor - 0.7F) < 1.0E-6F
+            && Math.abs(electricHoverFactor - 0.5F) < 1.0E-6F;
+        if (legacyElectric) {
+            electricEuPerTick = 4;
+            electricHoverEuPerTick = 2;
+            electricPowerFactor = 1.0F;
+            electricHoverFactor = 1.0F;
+            configuration.get(CATEGORY, "electricEuPerTick", 4)
+                .set(4);
+            configuration.get(CATEGORY, "electricHoverEuPerTick", 2)
+                .set(2);
+            configuration.get(CATEGORY, "electricPowerFactor", 1.0F)
+                .set(1.0F);
+            configuration.get(CATEGORY, "electricHoverFactor", 1.0F)
+                .set(1.0F);
+        }
+        if (altitudeFadeBlocks == 25) {
+            altitudeFadeBlocks = 0;
+            configuration.get(CATEGORY, "altitudeFadeBlocks", 0)
+                .set(0);
+        }
 
         if (configuration.hasChanged()) {
             configuration.save();

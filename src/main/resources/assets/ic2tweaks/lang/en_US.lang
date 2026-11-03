@@ -37,3 +37,6 @@ ic2tweaks.jetpack.tooltip.enabled=Jetpack: %s
 ic2tweaks.jetpack.tooltip.enabled.on=Enabled
 ic2tweaks.jetpack.tooltip.enabled.off=Disabled
 ic2tweaks.jetpack.tooltip.controls.quantum=Boost + Mode Switch: toggle quantum jetpack
+key.ic2tweaks.hover=Toggle Jetpack Hover
+key.categories.ic2tweaks=IC2Tweaks
+ic2tweaks.jetpack.tooltip.controls.3=Dedicated hover key: see Controls

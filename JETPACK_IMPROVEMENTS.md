@@ -2,8 +2,10 @@
 
 Status: Phase 0 (config + pure physics), Phase 1 (stock tick replacement, horizontal flight, bug fixes,
 armor HUD fix), Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) and the Phase 3 HUD/tooltip/particle, chargepad and optional quantum-chest integration are implemented.
-A chest jetpack (stock, quantum or GraviSuite) always wins over a bauble/TG jetpack. The remaining work is
-the landing-assist polish and the low-priority edge cases. Analysis based on decompiled IC2 2.2.828-experimental
+A chest jetpack (stock, quantum or GraviSuite) always wins over a bauble/TG jetpack. The flight/UX pass
+adds landing assist, configurable hover momentum, GUI pausing, a dedicated hover key, easy gas refuelling,
+balanced electric defaults and removes the arbitrary Y ceiling. Remaining work is release validation and
+the optional dedicated model/TG armour-stand rendering. Analysis based on decompiled IC2 2.2.828-experimental
 (`ItemArmorJetpack`, `ItemArmorJetpackElectric`, `ItemArmorFluidTank`, `ItemArmorQuantumSuit`), the
 1.7.10 movement code, the Baubles/TravellersGear 1.7.10 APIs, Hodgepodge 2.7.222 and GraviSuite 2.0.3.
 
@@ -355,7 +357,7 @@ B1-B4, B6-B9, B11, B16, B22; the entries below remain as the technical record.
 | B2 | H | Fuel-boundary free thrust | `useJetpack` ignores the return of `use()`; `drainfromJetpack` returns false if the tank has 1 mB and 2 are requested, so the last tick thrusts for free. Electric `discharge` likewise returns less than requested. Fix: check `getCharge(stack) >= cost` first and consume before/only when applying. |
 | B3 | H | Static `audioSource` / `lastJetpackUsed` leak | Both are static on the item class and never reset on unequip/disconnect/world change. Leaving the world while flying can leave the loop playing or make it silent on rejoin (`lastJetpackUsed` still true). Fix: per-player audio state in the tick handler; stop when not used; reset on logout/unload. |
 | B4 | H | Any non-gas jetpack is treated as electric | `boolean electric = jetpack.getItem() != Ic2Items.jetpack.getItem();` - an addon subclass/fluid jetpack is misclassified; `Ic2Items.jetpack` can also be null early. Fix: `instanceof IElectricItem` (or the electric class) and a type enum. |
-| B5 | M | `getSubItems` hard-codes `Ic2Items.jetpack` | The gas class's creative items use the gas item stack even when invoked on a subclass that does not override. Low impact for stock, breaks addons. Fix: `new ItemStack(this, 1)`. |
+| B5 | M | `getSubItems` hard-codes `Ic2Items.jetpack` | Fixed by the `MixinItemArmorJetpack` creative-item injection, which uses the actual item instance (`new ItemStack(this, 1)`). |
 | B6 | H | Hover toggle is not reliable on the client | `hoverMode` / `toggleTimer` are NBT and only written when `IC2.platform.isSimulating()` (server). The client reads the NBT each tick, flips a local boolean but never writes it, so while the combo is held it flips every tick (the client timer never decrements) and after release it reverts to the stale NBT value. With Hodgepodge's `fixIc2ArmorLag=true` the only NBT sync is gone as well, so the client and server can disagree about hover mode (code-level finding; worth confirming in-game). Fix: per-side local mode + cooldown state, seeded from NBT on equip/login; write NBT on both sides (the client copy is local anyway). |
 | B7 | H/M | `detectAndSendChanges()` every tick while used | 46-slot deep NBT compare + slot packets per tick (both stock classes). Hodgepodge already no-ops this (`fixIc2ArmorLag`, default true in the pack). Fix: do not call it in the replacement; the client simulates fuel/charge, so a periodic sync is only needed for GUIs. |
 | B8 | H | Thrust while riding / creative-flying / in water/lava | `onArmorTick` runs for the armour slot regardless of these states; hover mode drains fuel on a horse/boat and can fight creative flight. Fix: explicit guards. |
@@ -364,14 +366,14 @@ B1-B4, B6-B9, B11, B16, B22; the entries below remain as the technical record.
 | B11 | L | Gas `use()` parses/writes NBT twice | `drainfromJetpack` calls `drain(..., false)` and `drain(..., true)`, and `drain` calls `Updatedamage` each time. Fix: one `drain` + one damage update (or let the caller update once). |
 | B12 | L | Electric jetpack still implements `IFluidContainerItem` | Inherited from `ItemArmorFluidTank` with no-op fill/drain; shows up as an empty fluid container in fluid UIs. Harmless but confusing; clean up only if the class hierarchy is refactored. |
 | B13 | M | Quantum suit has the same bugs | Ground drain (8 EU/t while standing with jetpack mode + jump/fall), static audio, per-tick sync, hover sink (Hodgepodge fixes to 0). Consider routing it through the same physics helper later. |
-| B14 | L | Fuel is spent at the ceiling with zero lift | `power` fades to 0 but `use()` still charges; "used" stays true. Either accept (thrusters idle) or reduce/skip the cost when `power == 0`. |
-| B15 | L | Hover carry-over feels floaty | The `prevmotion` clamp can keep ascending for a few ticks after releasing jump in hover mode. Config `hoverMomentum`/damping if players complain. |
+| B14 | L | Fuel is spent at the ceiling with zero lift | Moot by default now that `altitudeFadeBlocks=0` removes the arbitrary ceiling; if a pack restores the fade, the last fade band still costs full fuel. |
+| B15 | L | Hover carry-over feels floaty | Fixed by `hoverMomentum` (default 0 stops upward carry-over immediately; 1 preserves the old behaviour). |
 | B16 | H | No strafe/back thrust at all | IC2's `KeyboardClient` only tracks forward; `useJetpack` only calls `moveFlying` on the forward key. Fix: read `movementInput` on the client. (This is the root of the user's complaint.) |
 | B17 | M | Inconsistent horizontal tuning vs the quantum suit | Gas/electric normal: 0.53/0.75 m/s; quantum normal: 4.44 m/s (its input saturates at the 0.02 friction); gas hover: 3.56 m/s vs quantum hover: 1.78 m/s. The 0.15 factor is likely an oversight. |
-| B18 | M | Electric jetpack is strictly worse in endurance and lift | 30,000 EU / 8 EU/t = 3.1 min vs gas 30,000 mB / 2 mB/t = 12.5 min; electric power 0.7 and ceiling 200 vs gas 1.0/256. Expose config and decide whether to buff or accept. |
+| B18 | M | Electric jetpack is strictly worse in endurance and lift | Balanced defaults: power/hover 1.0 (gas parity), 4/2 EU/t (half gas endurance but rechargeable), and no arbitrary altitude ceiling. Config still exposes the old stock values. |
 | B19 | L | `distanceWalkedModified = 0` kills footsteps (intended) | It also suppresses movement-stat/exhaustion effects while flying. Probably fine; just be aware if a food mod relies on it. |
 | B20 | L | NBT keys are not namespaced | `"hoverMode"`, `"toggleTimer"` can collide with other mods on the same stack (low risk; keep IC2's keys for compatibility and namespace new state). |
-| B21 | M | Flight input while a GUI is open is inconsistent | `KeyboardClient.sendKeyUpdate` sends no keys when `currentScreen != null && !allowUserInput`, so jump/thrust stops with the inventory open, while hover mode keeps working (it needs no key). Fix: decide the policy; either stop hover too, or read the raw client key state for jetpack input while a container is open (config). |
+| B21 | M | Flight input while a GUI is open is inconsistent | `pauseInGui` stops all thrust/hover client-side when a screen is open; the default keeps the existing behaviour (jump stops, hover continues). |
 | B22 | H | Jetpack shows 8 HUD armour points despite 0 absorption | `ItemArmorUtility` passes `ArmorMaterial.DIAMOND` to `ItemArmor`, so `damageReduceAmount` is 8; the vanilla HUD's `InventoryPlayer.getTotalArmorValue()` sums it, while `ISpecialArmor.getProperties` reduces 0. `ForgeHooks.getTotalArmorValue` honours `getArmorDisplay` (0) but the HUD does not use it. Fix: redirect the HUD/inventory armour total to the Forge hook when `stripJetpackArmorDisplay=true`; this also fixes the hazmat suit and CF pack. |
 
 ---
@@ -444,6 +446,8 @@ stripJetpackArmorDisplay
 hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
 hudShowSpeed, hudShowAltitude, hudLowFuelPercent
 tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset,
+landingAssist, landingAssistDistance, landingAssistSpeed, hoverMomentum,
+pauseInGui, dedicatedHoverKey, easyGasRefuel
 chargepadChargesBaubles
 tweakQuantumJetpack, quantumEuPerTick, quantumHoverEuPerTick
 baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
@@ -461,6 +465,8 @@ Notes on the Phase 0 defaults:
   accepted if a pack assigns it, and `belt` keeps original-Baubles compatibility. The old
   `cape,body,belt` default is migrated to include wings.
 - `syncIntervalTicks=0` means no extra sync; both sides simulate, matching IC2/Hodgepodge.
+- Old stock electric values (8/7/0.7/0.5) and the old `altitudeFadeBlocks=25` default are migrated to the
+  balanced/no-ceiling values; partially customised configs are untouched.
 - `stripJetpackArmorDisplay=true` is the fix for B22 (the misleading 8 HUD armour points). It is an
   early mixin on `EntityPlayer` (see Phase 1), because vanilla `EntityPlayer` is loaded before the late
   mixin phase.
@@ -489,7 +495,8 @@ Status: done. `enableJetpackTweaks=true` now replaces the stock tick for the two
   handler drains fuel and resets fall distance, and checks the two mixin markers.
 
 Phase 1 fixes: B1, B2, B3, B4, B6, B7, B8, B9 (configurable), B11, B16, B22. Deferred: B5 (addon creative
-items only), B12-B15, B19-B21. B10 is resolved by the Phase 3 tooltip pass.
+items only) is resolved by the Phase 3 creative-item mixin; B12-B15, B19-B21 are resolved or documented by
+the Phase 3 flight/UX pass. B10 is resolved by the tooltip pass.
 
 ### Phase 2 - Slots + rendering (implemented)
 
@@ -534,6 +541,15 @@ mods.
   through the common handler. Other quantum pieces keep their stock ticks.
 - [x] Chargepad support for an electric jetpack in a Baubles/TG slot (`chargepadChargesBaubles`).
 - [x] Double-jetpack policy: chest (stock/quantum/GraviSuite) wins over a bauble/TG jetpack.
+- [x] Soft-landing assist (`landingAssist`, distance/speed), configurable hover carry-over
+  (`hoverMomentum`), GUI pause (`pauseInGui`), dedicated hover key (`dedicatedHoverKey`), and easy gas
+  refuelling from a biogas container (`easyGasRefuel`).
+- [x] Removed the arbitrary gas/electric Y ceiling: `altitudeFadeBlocks=0` disables the fade and the
+  electric 200-block ceiling; set 25 to restore stock behaviour.
+- [x] Balanced electric defaults: gas-parity lift/hover speed and 4/2 EU/t (stock 8/7), i.e. half the gas
+  endurance but rechargeable.
+- [x] B5 addon creative items; B14 is moot with no ceiling; B15 is controlled by `hoverMomentum`; B19/B20
+  remain documented compatibility notes (stock IC2 NBT keys are intentionally retained).
 
 Implementation: `JetpackHudOverlay` and `JetpackTooltipHandler` are client-only and registered by the
 `@SidedProxy` client proxy (`ClientProxy`), which FML loads only on the physical client; `JetpackReadout`
@@ -622,6 +638,8 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   lava guards, and the fuel boundary.
 - `JetpackReadoutTest`: HUD/tooltip percentage clamping/rounding, thousands grouping, horizontal speed,
   altitude flooring and the low-fuel threshold (including 0 = disabled).
+- `JetpackPhysicsTest`: zero-fade/no-ceiling and hover-momentum sequences.
+- `JetpackRulesTest`: landing-assist eligibility and ground-range checks.
 - Run with `./gradlew test spotlessCheck checkstyleMain checkstyleTest`.
 
 **In-game harness:**

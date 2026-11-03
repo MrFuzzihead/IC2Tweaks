@@ -129,6 +129,27 @@ class JetpackPhysicsTest {
         assertEquals(1.0D, JetpackPhysics.altitudeFactor(175.0D, 256, 25, Kind.ELECTRIC, Double.NaN), EPS);
     }
 
+    @Test
+    void zeroFadeDisablesTheArbitraryCeiling() {
+        assertEquals(1.0D, JetpackPhysics.altitudeFactor(5000.0D, 256, 0, Kind.GAS, 1.28D), EPS);
+        assertEquals(1.0D, JetpackPhysics.altitudeFactor(5000.0D, 256, 0, Kind.ELECTRIC, 1.28D), EPS);
+    }
+
+    @Test
+    void hoverMomentumControlsUpwardCarryOver() {
+        Motion noMomentum = new Motion();
+        noMomentum.y = 0.2D;
+        JetpackPhysics
+            .applyConfiguredVertical(noMomentum, true, false, false, 1.0D, 1.0D, 0.6D, 0.2D, 0.2D, 0.0D, 0.0D);
+        assertEquals(0.0D, noMomentum.y, EPS);
+
+        Motion fullMomentum = new Motion();
+        fullMomentum.y = 0.2D;
+        JetpackPhysics
+            .applyConfiguredVertical(fullMomentum, true, false, false, 1.0D, 1.0D, 0.6D, 0.2D, 0.2D, 0.0D, 1.0D);
+        assertEquals(0.2D, fullMomentum.y, EPS);
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Configured (Phase 1) behaviour
     // ---------------------------------------------------------------------------------------------
@@ -324,7 +345,8 @@ class JetpackPhysicsTest {
                 ascentSpeed,
                 hoverRise,
                 hoverSink,
-                hoverIdle);
+                hoverIdle,
+                0.0D);
             moves.add(JetpackPhysics.moveAndApplyAirPhysics(motion).usedY);
         }
         return moves;

@@ -12,6 +12,8 @@ import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackNetwork;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRefuelHandler;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -83,6 +85,9 @@ public class IC2Tweaks {
         if (Loader.isModLoaded("TravellersGear")) {
             JetpackWorn.registerTravellersGear(new com.mrfuzzihead.ic2tweaks.jetpack.compat.TravellersGearCompat());
         }
+        JetpackNetwork.init();
+        MinecraftForge.EVENT_BUS.register(new JetpackRefuelHandler());
+
         // The proxy is selected by FML: the client registers the renderer/HUD/tooltip handlers; the
         // dedicated server never loads those classes.
         proxy.preInit(event);

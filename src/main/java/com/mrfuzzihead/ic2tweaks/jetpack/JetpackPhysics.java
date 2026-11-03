@@ -234,7 +234,8 @@ public final class JetpackPhysics {
      * still matches IC2's stock 0.1.
      */
     public static void applyConfiguredVertical(Motion motion, boolean hover, boolean jump, boolean sneak, double power,
-        double hoverPower, double ascentSpeed, double hoverRise, double hoverSink, double hoverIdle) {
+        double hoverPower, double ascentSpeed, double hoverRise, double hoverSink, double hoverIdle,
+        double hoverMomentum) {
         double safePower = clamp01(power);
         double safeHoverPower = clamp01(hoverPower);
         double previous = motion.y;
@@ -251,9 +252,15 @@ public final class JetpackPhysics {
             cap *= safeHoverPower;
         }
         if (motion.y > cap) {
-            motion.y = cap;
-            if (previous > motion.y) {
+            if (cap >= 0.0D) {
+                double carried = Math.max(previous, cap);
+                double momentum = Math.max(0.0D, Math.min(1.0D, hoverMomentum));
+                motion.y = cap + (carried - cap) * momentum;
+            } else if (previous > cap) {
+                // Preserve the stock gradual sneak-descent; only upward momentum is configurable.
                 motion.y = previous;
+            } else {
+                motion.y = cap;
             }
         }
     }
@@ -312,6 +319,10 @@ public final class JetpackPhysics {
         double electricAltitudeFactor) {
         if (worldHeight <= 0 || Double.isNaN(posY)) {
             return 0.0D;
+        }
+        if (fadeBlocks <= 0) {
+            // No arbitrary altitude ceiling: full power at every Y (the world still bounds flight).
+            return 1.0D;
         }
         double ceiling = worldHeight;
         if (kind == Kind.ELECTRIC) {

@@ -220,6 +220,25 @@ public class CommandIc2Tweaks extends CommandBase {
             sender,
             String.format(
                 Locale.ROOT,
+                "altitude fade: %d blocks (0 = no ceiling), electric factor %.2f",
+                JetpackConfig.altitudeFadeBlocks,
+                JetpackConfig.electricAltitudeFactor));
+        send(
+            sender,
+            String.format(
+                Locale.ROOT,
+                "UX: landing %s (%.1f blocks / %.2f b/t), hover momentum %.2f, pauseGui %s, hover key %s, gas refuel %s",
+                JetpackConfig.landingAssist,
+                JetpackConfig.landingAssistDistance,
+                JetpackConfig.landingAssistSpeed,
+                JetpackConfig.hoverMomentum,
+                JetpackConfig.pauseInGui,
+                JetpackConfig.dedicatedHoverKey,
+                JetpackConfig.easyGasRefuel));
+        send(
+            sender,
+            String.format(
+                Locale.ROOT,
                 "stock horizontal terminal: gas %.2f/%.2f m/s, electric %.2f/%.2f m/s (normal/hover)",
                 stockSpeed(Mode.NORMAL, Kind.GAS, 1.0D),
                 stockSpeed(Mode.HOVER, Kind.GAS, 1.0D),
