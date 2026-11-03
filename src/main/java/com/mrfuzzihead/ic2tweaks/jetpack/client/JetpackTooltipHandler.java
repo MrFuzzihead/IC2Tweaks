@@ -10,6 +10,7 @@ import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackItem;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackReadout;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
@@ -30,14 +31,14 @@ public final class JetpackTooltipHandler {
             return;
         }
         ItemStack stack = event.itemStack;
-        if (!JetpackWorn.isStockJetpack(stack)) {
+        if (!JetpackItem.isSupported(stack)) {
             return;
         }
-        ItemArmorJetpack item = (ItemArmorJetpack) stack.getItem();
         EntityPlayer player = event.entityPlayer;
-        boolean electric = item instanceof IElectricItem;
-        long charge = Math.round(item.getCharge(stack));
-        long capacity = Math.round(item.getMaxCharge(stack));
+        boolean electric = JetpackItem.isElectric(stack);
+        boolean quantum = JetpackItem.isQuantumJetpack(stack);
+        long charge = Math.round(JetpackItem.charge(stack));
+        long capacity = Math.round(JetpackItem.maxCharge(stack));
         int percent = JetpackReadout.percent(charge, capacity);
 
         // IC2's gas addInformation emits "< biogas, 1234 mB >"; replace it with the localized line below.
@@ -50,6 +51,15 @@ public final class JetpackTooltipHandler {
 
         boolean hover = stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("hoverMode");
+        if (quantum) {
+            boolean enabled = stack.hasTagCompound() && stack.getTagCompound()
+                .getBoolean("jetpack");
+            event.toolTip.add(
+                StatCollector.translateToLocalFormatted(
+                    "ic2tweaks.jetpack.tooltip.enabled",
+                    StatCollector.translateToLocal(
+                        enabled ? "ic2tweaks.jetpack.tooltip.enabled.on" : "ic2tweaks.jetpack.tooltip.enabled.off")));
+        }
         event.toolTip.add(
             StatCollector.translateToLocalFormatted(
                 "ic2tweaks.jetpack.tooltip.mode",
@@ -67,10 +77,10 @@ public final class JetpackTooltipHandler {
                 event.toolTip.add(
                     StatCollector.translateToLocalFormatted(
                         "ic2tweaks.jetpack.tooltip.tier",
-                        ((IElectricItem) item).getTier(stack)));
+                        ((IElectricItem) stack.getItem()).getTier(stack)));
             }
         } else {
-            FluidStack fluid = item.getFluid(stack);
+            FluidStack fluid = ((ItemArmorJetpack) stack.getItem()).getFluid(stack);
             String fluidName = fluid != null ? fluid.getLocalizedName()
                 : StatCollector.translateToLocal("ic2tweaks.jetpack.fluid.biogas");
             event.toolTip.add(
@@ -96,5 +106,8 @@ public final class JetpackTooltipHandler {
 
         event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.1"));
         event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.2"));
+        if (quantum) {
+            event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.quantum"));
+        }
     }
 }

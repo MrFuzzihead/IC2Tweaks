@@ -66,6 +66,18 @@ public enum Mixins implements IMixins {
         .addRequiredMod(TargetMods.IC2)
         .setApplyIf(() -> JetpackConfig.enabled)),
 
+    /** Replaces the quantum chest's integrated jetpack with the configurable controller. */
+    JETPACK_QUANTUM(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinItemArmorQuantumSuit")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> JetpackConfig.enabled && JetpackConfig.tweakQuantumJetpack)),
+
+    /** Lets chargepads charge an electric jetpack worn in a Baubles/TravellersGear slot. */
+    JETPACK_CHARGEPAD(new MixinBuilder().setPhase(Phase.LATE)
+        .addCommonMixins("ic2.MixinTileEntityChargepadBlock")
+        .addRequiredMod(TargetMods.IC2)
+        .setApplyIf(() -> JetpackConfig.enabled && JetpackConfig.chargepadChargesBaubles)),
+
     /** Original Baubles (no expanded API): makes the jetpack a belt/universal bauble. */
     JETPACK_BAUBLE_LEGACY(new MixinBuilder().setPhase(Phase.LATE)
         .addCommonMixins("ic2.MixinItemArmorJetpackBauble")

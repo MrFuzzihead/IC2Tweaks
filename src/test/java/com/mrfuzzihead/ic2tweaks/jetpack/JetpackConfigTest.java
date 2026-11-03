@@ -78,6 +78,8 @@ class JetpackConfigTest {
         assertEquals(1, JetpackConfig.gasHoverFuelPerTick);
         assertEquals(8, JetpackConfig.electricEuPerTick);
         assertEquals(7, JetpackConfig.electricHoverEuPerTick);
+        assertEquals(8, JetpackConfig.quantumEuPerTick);
+        assertEquals(10, JetpackConfig.quantumHoverEuPerTick);
         assertEquals(0.20F, JetpackConfig.gasLowFuelThreshold, 1.0E-6F);
         assertEquals(0.05F, JetpackConfig.electricLowFuelThreshold, 1.0E-6F);
 
@@ -98,6 +100,7 @@ class JetpackConfigTest {
         assertTrue(JetpackConfig.tooltipsEnabled);
         assertTrue(JetpackConfig.particlesEnabled);
         assertEquals(2, JetpackConfig.particleIntervalTicks);
+        assertTrue(JetpackConfig.chargepadChargesBaubles);
         assertEquals(0.75F, JetpackConfig.particleYOffset, 1.0E-6F);
 
         assertArrayEquals(new String[] { "cape", "wings", "body", "belt" }, JetpackConfig.baubleSlotTypes);
@@ -125,6 +128,12 @@ class JetpackConfigTest {
             .set("5");
         configuration.get(JetpackConfig.CATEGORY, "electricHoverEuPerTick", "7")
             .set("3");
+        configuration.get(JetpackConfig.CATEGORY, "quantumEuPerTick", "8")
+            .set("4");
+        configuration.get(JetpackConfig.CATEGORY, "quantumHoverEuPerTick", "10")
+            .set("6");
+        configuration.get(JetpackConfig.CATEGORY, "chargepadChargesBaubles", "true")
+            .set(false);
         configuration.get(JetpackConfig.CATEGORY, "electricPowerFactor", "0.7")
             .set("1.0");
         configuration.get(JetpackConfig.CATEGORY, "baubleSlotTypes", "cape,wings,body,belt")
@@ -155,6 +164,9 @@ class JetpackConfigTest {
         assertEquals(0.42F, JetpackConfig.horizontalSpeed, 1.0E-6F);
         assertEquals(5, JetpackConfig.gasFuelPerTick);
         assertEquals(3, JetpackConfig.electricHoverEuPerTick);
+        assertEquals(4, JetpackConfig.quantumEuPerTick);
+        assertEquals(6, JetpackConfig.quantumHoverEuPerTick);
+        assertFalse(JetpackConfig.chargepadChargesBaubles);
         assertEquals(1.0F, JetpackConfig.electricPowerFactor, 1.0E-6F);
         assertEquals(0, JetpackConfig.baubleSlotTypes.length);
         assertFalse(JetpackConfig.isBaubleSlotEnabled());

@@ -20,9 +20,11 @@ import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Kind;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
 
+import ic2.core.block.wiring.TileEntityChargepadBlock;
 import ic2.core.energy.EnergyNetLocal;
 import ic2.core.init.MainConfig;
 import ic2.core.item.armor.ItemArmorJetpack;
+import ic2.core.item.armor.ItemArmorQuantumSuit;
 import ic2.core.item.tool.ItemToolWrench;
 import ic2.core.util.ConfigUtil;
 
@@ -127,6 +129,8 @@ public class CommandIc2Tweaks extends CommandBase {
         boolean baubleMixin = hasMethod(ItemArmorJetpack.class, "ic2tweaks$baubleMixinApplied")
             || hasMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied");
         boolean travellersGearMixin = hasMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied");
+        boolean quantumMixin = hasMethod(ItemArmorQuantumSuit.class, "ic2tweaks$quantumJetpackMixinApplied");
+        boolean chargepadMixin = hasMethod(TileEntityChargepadBlock.class, "ic2tweaks$chargepadMixinApplied");
         send(
             sender,
             "tick mixin: " + colour(tickMixin) + tickMixin + EnumChatFormatting.GRAY + " (stock onArmorTick replaced)");
@@ -153,6 +157,22 @@ public class CommandIc2Tweaks extends CommandBase {
                 + EnumChatFormatting.GRAY
                 + " (slot "
                 + JetpackConfig.travellersGearSlot
+                + ")");
+        send(
+            sender,
+            "quantum mixin: " + colour(quantumMixin)
+                + quantumMixin
+                + EnumChatFormatting.GRAY
+                + " (tweakQuantumJetpack "
+                + JetpackConfig.tweakQuantumJetpack
+                + ")");
+        send(
+            sender,
+            "chargepad mixin: " + colour(chargepadMixin)
+                + chargepadMixin
+                + EnumChatFormatting.GRAY
+                + " (chargepadChargesBaubles "
+                + JetpackConfig.chargepadChargesBaubles
                 + ")");
         send(
             sender,

@@ -12,11 +12,11 @@ import net.minecraft.util.StatCollector;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackItem;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackReadout;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import ic2.core.item.armor.ItemArmorJetpack;
 
 /**
  * Compact jetpack HUD: charge percentage, mode, speed and altitude. It is registered only on the client
@@ -46,11 +46,13 @@ public final class JetpackHudOverlay {
             return;
         }
 
-        ItemArmorJetpack item = (ItemArmorJetpack) stack.getItem();
-        int percent = JetpackReadout.percent(item.getCharge(stack), item.getMaxCharge(stack));
+        int percent = JetpackReadout.percent(JetpackItem.charge(stack), JetpackItem.maxCharge(stack));
         boolean warn = JetpackConfig.hudLowFuelPercent > 0;
         boolean low = JetpackReadout.lowFuel(percent, JetpackConfig.hudLowFuelPercent);
         boolean empty = warn && percent == 0;
+        boolean quantum = JetpackItem.isQuantumJetpack(stack);
+        boolean enabled = !quantum || stack.hasTagCompound() && stack.getTagCompound()
+            .getBoolean("jetpack");
         boolean hover = stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("hoverMode");
 
@@ -114,7 +116,8 @@ public final class JetpackHudOverlay {
         Gui.drawRect(x - 3, y - 3, x + width + 3, y + lines.size() * LINE_HEIGHT + 1, BACKGROUND);
         mc.fontRenderer.drawStringWithShadow(line1, x, y, warn && (low || empty) ? 0xFF5555 : 0xFFFFFF);
         if (lines.size() > 1) {
-            mc.fontRenderer.drawStringWithShadow(line2, x, y + LINE_HEIGHT, hover ? 0x55FFFF : 0xAAAAAA);
+            mc.fontRenderer
+                .drawStringWithShadow(line2, x, y + LINE_HEIGHT, !enabled ? 0xAAAAAA : hover ? 0x55FFFF : 0xAAAAAA);
         }
     }
 }

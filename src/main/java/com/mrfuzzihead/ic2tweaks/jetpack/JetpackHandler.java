@@ -15,9 +15,7 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent;
-import ic2.api.item.IElectricItem;
 import ic2.core.IC2;
-import ic2.core.item.armor.ItemArmorJetpack;
 import ic2.core.util.StackUtil;
 
 /**
@@ -60,6 +58,13 @@ public final class JetpackHandler {
             return;
         }
 
+        boolean quantum = JetpackItem.isQuantumJetpack(stack);
+        if (quantum) {
+            // Stock quantum extinguishes the player every chest tick; its onArmorTick is cancelled for
+            // the integrated controller, so keep that behaviour here.
+            player.extinguish();
+        }
+
         if (!JetpackRules.canOperate(
             player.isDead,
             player.isRiding(),
@@ -78,8 +83,18 @@ public final class JetpackHandler {
         if (state.seededStack != stack) {
             state.hoverMode = stack.hasTagCompound() && stack.getTagCompound()
                 .getBoolean("hoverMode");
+            state.jetpackEnabled = stack.hasTagCompound() && stack.getTagCompound()
+                .getBoolean("jetpack");
             state.seededStack = stack;
             state.comboDown = false;
+            state.quantumComboDown = false;
+        }
+        if (quantum) {
+            // The quantum chest's stock chest tick is cancelled, so the handler owns both toggles.
+            state.hoverMode = stack.hasTagCompound() && stack.getTagCompound()
+                .getBoolean("hoverMode");
+            state.jetpackEnabled = stack.hasTagCompound() && stack.getTagCompound()
+                .getBoolean("jetpack");
         }
 
         if (state.toggleCooldown > 0) {
@@ -88,6 +103,7 @@ public final class JetpackHandler {
 
         boolean jump = IC2.keyboard.isJumpKeyDown(player);
         boolean modeSwitch = IC2.keyboard.isModeSwitchKeyDown(player);
+        boolean boost = IC2.keyboard.isBoostKeyDown(player);
         boolean combo = jump && modeSwitch;
         // Edge-triggered so holding the combo only toggles once; the cooldown only guards very fast presses.
         if (combo && !state.comboDown && state.toggleCooldown == 0) {
@@ -106,12 +122,35 @@ public final class JetpackHandler {
         }
         state.comboDown = combo;
 
-        ItemArmorJetpack item = (ItemArmorJetpack) stack.getItem();
-        JetpackPhysics.Kind kind = item instanceof IElectricItem ? JetpackPhysics.Kind.ELECTRIC
+        if (quantum) {
+            boolean comboJetpack = boost && modeSwitch;
+            if (comboJetpack && !state.quantumComboDown && state.toggleCooldown == 0) {
+                state.toggleCooldown = 10;
+                state.jetpackEnabled = !state.jetpackEnabled;
+                StackUtil.getOrCreateNbtData(stack)
+                    .setBoolean("jetpack", state.jetpackEnabled);
+                StackUtil.getOrCreateNbtData(stack)
+                    .setByte("toggleTimer", (byte) 10);
+                if (!client) {
+                    IC2.platform.messagePlayer(
+                        player,
+                        StatCollector.translateToLocal(
+                            state.jetpackEnabled ? "ic2tweaks.jetpack.quantum.on" : "ic2tweaks.jetpack.quantum.off"));
+                }
+            }
+            state.quantumComboDown = comboJetpack;
+        }
+
+        JetpackPhysics.Kind kind = JetpackItem.isElectric(stack) ? JetpackPhysics.Kind.ELECTRIC
             : JetpackPhysics.Kind.GAS;
-        double charge = item.getCharge(stack);
-        double maxCharge = item.getMaxCharge(stack);
+        double charge = JetpackItem.charge(stack);
+        double maxCharge = JetpackItem.maxCharge(stack);
         if (charge <= 0.0D) {
+            state.stopAudio();
+            state.thrusting = false;
+            return;
+        }
+        if (quantum && !state.jetpackEnabled) {
             state.stopAudio();
             state.thrusting = false;
             return;
@@ -139,12 +178,12 @@ public final class JetpackHandler {
             player.posY,
             IC2.getWorldHeight(player.worldObj),
             JetpackConfig.altitudeFadeBlocks,
-            kind,
+            // Stock quantum has no electric-style ceiling; use the world-height ceiling.
+            quantum ? JetpackPhysics.Kind.GAS : kind,
             JetpackConfig.electricAltitudeFactor);
         double powerFactor = kind == JetpackPhysics.Kind.ELECTRIC ? JetpackConfig.electricPowerFactor : 1.0D;
         double normalPower = lowFuel * altitude * powerFactor;
         double hoverPower = lowFuel * altitude;
-        boolean boost = IC2.keyboard.isBoostKeyDown(player);
         double speedBoost = boost ? JetpackConfig.boostMultiplier : 1.0D;
         double hoverScale = kind == JetpackPhysics.Kind.ELECTRIC ? JetpackConfig.electricHoverFactor : 1.0D;
         boolean sneak = player.isSneaking();
@@ -155,8 +194,8 @@ public final class JetpackHandler {
             boost,
             JetpackConfig.gasFuelPerTick,
             JetpackConfig.gasHoverFuelPerTick,
-            JetpackConfig.electricEuPerTick,
-            JetpackConfig.electricHoverEuPerTick,
+            quantum ? JetpackConfig.quantumEuPerTick : JetpackConfig.electricEuPerTick,
+            quantum ? JetpackConfig.quantumHoverEuPerTick : JetpackConfig.electricHoverEuPerTick,
             JetpackConfig.boostFuelMultiplier);
         if (!JetpackWorn.isChestSlot(player, stack)) {
             cost = (int) Math.ceil(cost * JetpackConfig.slotFuelMultiplier);
@@ -171,7 +210,11 @@ public final class JetpackHandler {
                 state.thrusting = false;
                 return;
             }
-            item.use(stack, cost);
+            if (!JetpackItem.consume(player, stack, cost)) {
+                state.stopAudio();
+                state.thrusting = false;
+                return;
+            }
             if (!client && JetpackConfig.syncIntervalTicks > 0 && JetpackWorn.isChestSlot(player, stack)) {
                 if (++state.syncCounter >= JetpackConfig.syncIntervalTicks) {
                     player.inventoryContainer.detectAndSendChanges();

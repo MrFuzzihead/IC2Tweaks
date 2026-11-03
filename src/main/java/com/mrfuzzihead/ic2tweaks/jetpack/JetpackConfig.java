@@ -104,6 +104,12 @@ public final class JetpackConfig {
     /** EU consumed per tick by the electric jetpack in hover mode. IC2's stock value is 7 EU/t. */
     public static int electricHoverEuPerTick = 7;
 
+    /** EU consumed per tick by the quantum chest in normal mode. IC2's stock value is 8 EU/t. */
+    public static int quantumEuPerTick = 8;
+
+    /** EU consumed per tick by the quantum chest in hover mode. IC2's stock value is 10 EU/t. */
+    public static int quantumHoverEuPerTick = 10;
+
     /** Charge fraction below which the jetpack's lift starts to fade (gas stock: 0.20). */
     public static float gasLowFuelThreshold = 0.20F;
 
@@ -171,6 +177,9 @@ public final class JetpackConfig {
 
     /** Add the jetpack status/controls lines to the item tooltip. */
     public static boolean tooltipsEnabled = true;
+
+    /** Let chargepads charge an electric jetpack worn in a Baubles/TravellersGear slot. */
+    public static boolean chargepadChargesBaubles = true;
 
     /** Show exhaust particles while the jetpack is thrusting. */
     public static boolean particlesEnabled = true;
@@ -432,6 +441,22 @@ public final class JetpackConfig {
             10000,
             "EU consumed per tick by the electric jetpack in hover mode. IC2's stock value is 7 EU/t.");
 
+        quantumEuPerTick = configuration.getInt(
+            "quantumEuPerTick",
+            CATEGORY,
+            8,
+            0,
+            100000,
+            "EU consumed per tick by the quantum chest in normal mode. IC2's stock value is 8 EU/t.");
+
+        quantumHoverEuPerTick = configuration.getInt(
+            "quantumHoverEuPerTick",
+            CATEGORY,
+            10,
+            0,
+            100000,
+            "EU consumed per tick by the quantum chest in hover mode. IC2's stock value is 10 EU/t.");
+
         gasLowFuelThreshold = configuration.getFloat(
             "gasLowFuelThreshold",
             CATEGORY,
@@ -530,6 +555,13 @@ public final class JetpackConfig {
             CATEGORY,
             true,
             "Add the jetpack status and controls lines to the item tooltip.");
+
+        chargepadChargesBaubles = configuration.getBoolean(
+            "chargepadChargesBaubles",
+            CATEGORY,
+            true,
+            "Let IC2 chargepads charge an electric jetpack worn in a Baubles/TravellersGear slot. Requires "
+                + "a restart.");
 
         particlesEnabled = configuration
             .getBoolean("particlesEnabled", CATEGORY, true, "Show exhaust particles while the jetpack is thrusting.");

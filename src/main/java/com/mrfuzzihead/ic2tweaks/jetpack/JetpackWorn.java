@@ -55,6 +55,14 @@ public final class JetpackWorn {
         if (isStockJetpack(chest)) {
             return chest;
         }
+        // Chest wins over a bauble/TG jetpack. A quantum chest is only handed to the controller when
+        // the optional quantum integration is enabled; otherwise stock IC2/GraviSuite keeps control.
+        if (JetpackItem.isQuantumJetpack(chest)) {
+            return JetpackConfig.tweakQuantumJetpack ? chest : null;
+        }
+        if (JetpackItem.isGraviSuiteJetpack(chest) || chest != null && chest.getItem() instanceof ItemArmorJetpack) {
+            return null;
+        }
         if (baublesProvider != null) {
             ItemStack found = baublesProvider.findWorn(player);
             if (isStockJetpack(found)) {
@@ -85,6 +93,16 @@ public final class JetpackWorn {
         Class<?> itemClass = stack.getItem()
             .getClass();
         return itemClass == ItemArmorJetpack.class || itemClass == ItemArmorJetpackElectric.class;
+    }
+
+    /** @return the jetpack worn in the Baubles/Expanded slots, or {@code null}. */
+    public static ItemStack getBaubles(EntityPlayer player) {
+        return baublesProvider != null ? baublesProvider.findWorn(player) : null;
+    }
+
+    /** @return the jetpack worn in the TravellersGear slot, or {@code null}. */
+    public static ItemStack getTravellersGear(EntityPlayer player) {
+        return travellersGearProvider != null ? travellersGearProvider.findWorn(player) : null;
     }
 
     /** @return whether the stack is the one currently worn in the chest slot. */

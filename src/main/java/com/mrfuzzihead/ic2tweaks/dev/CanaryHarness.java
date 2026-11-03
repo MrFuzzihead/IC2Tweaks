@@ -19,11 +19,15 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import com.mojang.authlib.GameProfile;
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackItem;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Kind;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Motion;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRules;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -32,10 +36,13 @@ import ic2.api.energy.EnergyNet;
 import ic2.api.energy.NodeStats;
 import ic2.api.energy.tile.IEnergySink;
 import ic2.api.energy.tile.IEnergySource;
+import ic2.api.item.ElectricItem;
 import ic2.core.Ic2Items;
+import ic2.core.block.wiring.TileEntityChargepadBlock;
 import ic2.core.block.wiring.TileEntityElectricBlock;
 import ic2.core.block.wiring.TileEntityTransformer;
 import ic2.core.item.armor.ItemArmorJetpack;
+import ic2.core.item.armor.ItemArmorQuantumSuit;
 import ic2.core.util.StackUtil;
 
 /**
@@ -63,6 +70,14 @@ public final class CanaryHarness {
     private EntityPlayer travellersGearPlayer;
     private double travellersGearChargeBefore;
     private double travellersGearChargeAfter;
+    private EntityPlayer quantumPlayer;
+    private ItemStack quantumStack;
+    private double quantumChargeBefore;
+    private double quantumChargeAfter;
+    private EntityPlayer chargepadPlayer;
+    private ItemStack chargepadStack;
+    private double chargepadChargeBefore;
+    private double chargepadChargeAfter;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -171,6 +186,73 @@ public final class CanaryHarness {
         }
         buildBaublesProbe();
         buildTravellersGearProbe();
+        buildQuantumProbe();
+        buildChargepadProbe();
+    }
+
+    private void buildChargepadProbe() {
+        if (!JetpackConfig.chargepadChargesBaubles || !Loader.isModLoaded("Baubles")) {
+            return;
+        }
+        try {
+            TileEntity tile = place(Ic2Items.ChargepadbatBox, 3, 25);
+            if (!(tile instanceof TileEntityChargepadBlock)) {
+                failures.add("chargepad probe: tile is " + tile);
+                return;
+            }
+            TileEntityChargepadBlock pad = (TileEntityChargepadBlock) tile;
+            pad.onLoaded();
+            charge(pad, 100_000.0D, 1);
+
+            chargepadStack = Ic2Items.electricJetpack.copy();
+            chargepadPlayer = makePlayer("ic2tweaks_chargepad");
+            IInventory inventory = (IInventory) Class.forName("baubles.api.BaublesApi")
+                .getMethod("getBaubles", EntityPlayer.class)
+                .invoke(null, chargepadPlayer);
+            if (inventory == null) {
+                failures.add("chargepad probe: baubles inventory is null");
+                return;
+            }
+            inventory.setInventorySlotContents(3, chargepadStack);
+            chargepadChargeBefore = JetpackItem.charge(chargepadStack);
+            pad.playerstandsat(chargepadPlayer);
+            for (int i = 0; i < 40; i++) {
+                pad.updateEntity();
+            }
+            chargepadChargeAfter = JetpackItem.charge(chargepadStack);
+        } catch (Exception e) {
+            failures.add("chargepad probe: " + e);
+            IC2Tweaks.LOG.error("[canary] chargepad probe failed", e);
+        }
+    }
+
+    private void buildQuantumProbe() {
+        if (!JetpackConfig.tweakQuantumJetpack) {
+            return;
+        }
+        try {
+            quantumStack = Ic2Items.quantumBodyarmor.copy();
+            ElectricItem.manager.charge(quantumStack, 100_000.0D, 4, true, false);
+            StackUtil.getOrCreateNbtData(quantumStack)
+                .setBoolean("jetpack", true);
+            StackUtil.getOrCreateNbtData(quantumStack)
+                .setBoolean("hoverMode", true);
+            quantumPlayer = makePlayer("ic2tweaks_quantum");
+            quantumPlayer.inventory.armorInventory[2] = quantumStack;
+            quantumChargeBefore = JetpackItem.charge(quantumStack);
+            JetpackHandler handler = new JetpackHandler();
+            TickEvent.PlayerTickEvent event = new TickEvent.PlayerTickEvent(TickEvent.Phase.START, quantumPlayer);
+            for (int i = 0; i < 10; i++) {
+                quantumPlayer.setPosition(6.5D, Y + 40.0D, 0.5D);
+                quantumPlayer.motionY = 0.0D;
+                quantumPlayer.onGround = false;
+                handler.onPlayerTick(event);
+            }
+            quantumChargeAfter = JetpackItem.charge(quantumStack);
+        } catch (Exception e) {
+            failures.add("quantum probe: " + e);
+            IC2Tweaks.LOG.error("[canary] quantum probe failed", e);
+        }
     }
 
     private void buildBaublesProbe() {
@@ -433,6 +515,26 @@ public final class CanaryHarness {
             "jetpack armor HUD mixin applied",
             hasIc2TweaksMethod(EntityPlayer.class, "ic2tweaks$armorHudMixinApplied"),
             "EntityPlayer");
+        if (JetpackConfig.tweakQuantumJetpack) {
+            check(
+                "jetpack quantum mixin applied",
+                hasIc2TweaksMethod(ItemArmorQuantumSuit.class, "ic2tweaks$quantumJetpackMixinApplied"),
+                "ItemArmorQuantumSuit");
+            if (quantumPlayer != null) {
+                check(
+                    "quantum chest wins over a bauble jetpack",
+                    JetpackWorn.get(quantumPlayer) == quantumStack,
+                    "resolver");
+                double drained = quantumChargeBefore - quantumChargeAfter;
+                check("quantum handler drains hover EU", drained >= 80.0D && drained <= 120.0D, "drained=" + drained);
+            }
+        }
+        if (JetpackConfig.chargepadChargesBaubles) {
+            check(
+                "jetpack chargepad mixin applied",
+                hasIc2TweaksMethod(TileEntityChargepadBlock.class, "ic2tweaks$chargepadMixinApplied"),
+                "TileEntityChargepadBlock");
+        }
 
         if (jetpackPlayer == null) {
             check("jetpack handler real-player probe", false, "player=null");
@@ -474,6 +576,10 @@ public final class CanaryHarness {
                 "jetpack travellersgear mixin applied",
                 hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied"),
                 "TravellersGear");
+        }
+        if (chargepadPlayer != null) {
+            double gained = chargepadChargeAfter - chargepadChargeBefore;
+            check("chargepad charges a Baubles-slot electric jetpack", gained > 0.0D, "gained=" + gained);
         }
         if (baublesPlayer != null) {
             check(

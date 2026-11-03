@@ -33,8 +33,9 @@ that changes to IC2 itself can be shipped and versioned independently.
   per-player hover state that no longer depends on the old NBT sync, and a HUD fix that hides the
   jetpack's fake 8 armour points. Stock jetpacks can also be worn in Baubles-Expanded `cape`/`wings`/`body`/`belt`
   slots or the TravellersGear cloak/shoulder slot, with a rendered backpack. Phase 3 adds a compact
-  fuel/mode/speed/altitude HUD, localized fuel/mode/slot/controls tooltips, and exhaust particles; see
-  `JETPACK_IMPROVEMENTS.md`.
+  fuel/mode/speed/altitude HUD, localized fuel/mode/slot/controls tooltips, exhaust particles, chargepad
+  support for bauble/TG electric jetpacks, and optional quantum-chest integration. A chest jetpack always
+  wins over a bauble/TG jetpack; see `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
   (BatBox, CESU, MFE, MFSU, chargepads and addon storage) and for ordinary `TileEntityElectricMachine`
@@ -188,10 +189,13 @@ tooltips and particles are active):
 | `electricHoverFactor` | `0.5` | Scales the electric jetpack's hover speeds (stock 0.1 instead of 0.2) |
 | `electricPowerFactor` | `0.7` | Normal-mode lift/horizontal multiplier for the electric jetpack (stock 0.7; set 1.0 for gas parity) |
 | `gasFuelPerTick` / `gasHoverFuelPerTick` | `2` / `1` | Biogas mB/tick in normal/hover mode |
-| `electricEuPerTick` / `electricHoverEuPerTick` | `8` / `7` | EU/tick in normal/hover mode |
+| `electricEuPerTick` / `electricHoverEuPerTick` | `8` / `7` | EU/tick for the electric jetpack in normal/hover mode |
+| `quantumEuPerTick` / `quantumHoverEuPerTick` | `8` / `10` | EU/tick for the integrated quantum chest in normal/hover mode |
 | `altitudeFadeBlocks` / `electricAltitudeFactor` | `25` / `1.28` | Altitude fade length and electric ceiling divisor |
 | `baubleSlotTypes` | `cape,wings,body,belt` | Comma-separated Baubles slot types (cape/wings/body require Baubles-Expanded; belt works with original Baubles); `OFF` disables. The old `cape,body,belt` default is migrated to include wings. Requires a restart |
 | `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
+| `tweakQuantumJetpack` | `false` | Drive the quantum chest with the new controller (8/10 EU/t, same movement/HUD/particles). Requires a restart |
+| `chargepadChargesBaubles` | `true` | Let chargepads charge an electric jetpack worn in a Baubles/TG slot. Requires a restart |
 | `slotFuelMultiplier` | `1.0` | Extra fuel multiplier while worn in a bauble/TG slot |
 | `allowInWater` / `allowInLava` | `false` | Allow thrust in water/lava |
 | `creativeNoDrain` / `fallProtection` | `true` / `false` | Creative no-drain; keep fall protection while charged |

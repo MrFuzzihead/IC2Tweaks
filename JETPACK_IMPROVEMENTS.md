@@ -1,9 +1,9 @@
 # IC2 Jetpack Improvement Plan
 
 Status: Phase 0 (config + pure physics), Phase 1 (stock tick replacement, horizontal flight, bug fixes,
-armor HUD fix), Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) and the Phase 3 HUD, tooltips
-and particle pass are implemented. The remaining Phase 3 work is the quantum-suit/GraviSuite/chargepad
-compatibility and the low-priority edge cases. Analysis based on decompiled IC2 2.2.828-experimental
+armor HUD fix), Phase 2 (Baubles-Expanded/TravellersGear slots + rendering) and the Phase 3 HUD/tooltip/particle, chargepad and optional quantum-chest integration are implemented.
+A chest jetpack (stock, quantum or GraviSuite) always wins over a bauble/TG jetpack. The remaining work is
+the landing-assist polish and the low-priority edge cases. Analysis based on decompiled IC2 2.2.828-experimental
 (`ItemArmorJetpack`, `ItemArmorJetpackElectric`, `ItemArmorFluidTank`, `ItemArmorQuantumSuit`), the
 1.7.10 movement code, the Baubles/TravellersGear 1.7.10 APIs, Hodgepodge 2.7.222 and GraviSuite 2.0.3.
 
@@ -153,7 +153,7 @@ model, and a speed cap.
   `player.inventory.armorInventory[2]`.
 - The per-tick inventory sync only covers `inventoryContainer`, not the Baubles/TG inventories.
 - IC2's chargepad charges `armorInventory` + `mainInventory` only, so a bauble-worn electric jetpack
-  cannot be recharged by a chargepad.
+  cannot be recharged by a chargepad (fixed in Phase 3 by `MixinTileEntityChargepadBlock`).
 
 ### 3.2 Design
 
@@ -443,7 +443,9 @@ allowInWater, allowInLava, creativeNoDrain, fallProtection,
 stripJetpackArmorDisplay
 hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
 hudShowSpeed, hudShowAltitude, hudLowFuelPercent
-tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset
+tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset,
+chargepadChargesBaubles
+tweakQuantumJetpack, quantumEuPerTick, quantumHoverEuPerTick
 baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
 slotFuelMultiplier, renderWornJetpack, syncIntervalTicks
 ```
@@ -516,10 +518,10 @@ mods.
 - The canary now checks the Baubles mixin marker and drains a jetpack placed in a Baubles slot
   (`drained=10.0`); TravellersGear checks are conditional on the mod being loaded.
 - Remaining Phase 2 limitations: the model is the zero-art offset-torso version (a dedicated tank/nozzle
-  model is Phase 3); TG armour-stand rendering is not covered; a quantum/GraviSuite chest plus a bauble
-  jetpack still has two thrust sources (Phase 3 compatibility).
+  model is still optional); TG armour-stand rendering is not covered. The quantum/GraviSuite chest plus
+  bauble double-thrust case is resolved by the Phase 3 chest-wins policy.
 
-### Phase 3 - Polish (HUD/tooltips/particles implemented)
+### Phase 3 - Polish (HUD/tooltips/particles/chargepad/quantum implemented)
 
 - [x] HUD (`RenderGameOverlayEvent.Post`): fuel %, hover/normal mode, horizontal speed and altitude,
   low-fuel/empty warning, configurable corner and line toggles.
@@ -527,7 +529,11 @@ mods.
   tier (advanced tooltips) and controls. IC2's raw `<fluid, amount mB>` gas line is replaced.
 - [x] Exhaust particles (`JetpackParticles`): client-only smoke for gas / flame for electric, with a
   configurable interval and extra puffs on boost.
-- [ ] Optional quantum suit mixin and GraviSuite coexistence checks.
+- [x] Optional quantum-chest controller mixin (`tweakQuantumJetpack`, default off): cancels the stock
+  chest tick/`useJetpack` and routes movement, hover/enable toggles, drain, HUD/tooltip and particles
+  through the common handler. Other quantum pieces keep their stock ticks.
+- [x] Chargepad support for an electric jetpack in a Baubles/TG slot (`chargepadChargesBaubles`).
+- [x] Double-jetpack policy: chest (stock/quantum/GraviSuite) wins over a bauble/TG jetpack.
 
 Implementation: `JetpackHudOverlay` and `JetpackTooltipHandler` are client-only and registered by the
 `@SidedProxy` client proxy (`ClientProxy`), which FML loads only on the physical client; `JetpackReadout`
@@ -536,6 +542,9 @@ is unit-tested; `JetpackWorn.slotOf` supplies the tooltip's worn-slot line. The 
 through `JetpackWorn`, so it works for the chest, Baubles-Expanded and TravellersGear slots. The
 `hudEnabled`/`hudCorner`/`hudShowSpeed`/`hudShowAltitude`/`hudLowFuelPercent`, `tooltipsEnabled` and
 `particlesEnabled`/`particleIntervalTicks`/`particleYOffset` options are in the `jetpack` config category.
+The chargepad mixin charges the bauble/TG electric stack at the pad's tier limit (32/128/512/2048 EU).
+The quantum integration uses `quantumEuPerTick`/`quantumHoverEuPerTick` (8/10 EU/t) and preserves the
+quantum chest's separate `jetpack` enable toggle (Boost + Mode Switch); `hoverMode` remains Jump + Mode.
 
 ### Phase 4 - Docs and validation
 
@@ -552,6 +561,7 @@ com/mrfuzzihead/ic2tweaks/jetpack/
   JetpackHandler.java           (done, Phase 1: server fuel/fall; client motion/audio)
   JetpackState.java             (done, Phase 1)
   JetpackWorn.java              (done, Phase 1/2; slotOf for the tooltip)
+  JetpackItem.java              (done, Phase 3: stock/electric/quantum access)
   JetpackParticles.java         (done, Phase 3)
   JetpackReadout.java           (done, Phase 3)
   client/JetpackRenderer.java   (done, Phase 2)
@@ -621,6 +631,9 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
   - checks the stock gas/electric horizontal speeds, the configured 0.32 b/t target and the 12.5-minute
     gas endurance;
   - checks the guard rules and both mixin markers;
+  - when `tweakQuantumJetpack=true`, checks the quantum mixin, the chest-wins resolver and a real quantum
+    hover drain (100 EU over 10 ticks);
+  - charges a bauble-slot electric jetpack from a real chargepad tile and checks the gained EU;
   - ticks a real `EntityPlayer` with a filled gas jetpack in hover mode for 10 ticks and verifies the
     handler drained 10 mB and reset fall distance (`drained=10.0`, `fall=0.0` in the log).
 

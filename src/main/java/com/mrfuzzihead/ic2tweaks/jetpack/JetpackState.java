@@ -21,11 +21,15 @@ final class JetpackState {
 
     /** Locally held hover mode, seeded from the stack's NBT when the worn stack changes. */
     boolean hoverMode;
+
+    /** Quantum chest only: whether its integrated jetpack is enabled (stock NBT key {@code jetpack}). */
+    boolean jetpackEnabled;
     ItemStack seededStack;
 
     /** Local debounce for the hover toggle; the edge detector prevents re-toggling while the keys are held. */
     int toggleCooldown;
     boolean comboDown;
+    boolean quantumComboDown;
 
     /** Server-only counter for the optional low-frequency charge/NBT sync. */
     int syncCounter;
