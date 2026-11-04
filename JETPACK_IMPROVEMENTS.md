@@ -531,7 +531,8 @@ mods.
 ### Phase 3 - Polish (HUD/tooltips/particles/chargepad/quantum implemented)
 
 - [x] HUD (`RenderGameOverlayEvent.Post`): fuel %, hover/normal mode, horizontal speed and altitude,
-  low-fuel/empty warning, configurable corner and line toggles.
+  low-fuel/empty warning, configurable corner and line toggles. The quantum chest HUD is hidden while
+  its own jetpack mode is off.
 - [x] Tooltips (`ItemTooltipEvent`) and lang keys: localized fuel/charge values, mode, worn slot,
   tier (advanced tooltips) and controls. IC2's raw `<fluid, amount mB>` gas line is replaced.
 - [x] Exhaust particles (`JetpackParticles`): client-only smoke for gas / flame for electric, with a

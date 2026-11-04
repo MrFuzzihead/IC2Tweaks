@@ -54,6 +54,10 @@ public final class JetpackHudOverlay {
         boolean quantum = JetpackItem.isQuantumJetpack(stack);
         boolean enabled = !quantum || stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("jetpack");
+        // The quantum chest's own jetpack mode is off: no flight controller and no fuel HUD.
+        if (quantum && !enabled) {
+            return;
+        }
         boolean hover = stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("hoverMode");
 
