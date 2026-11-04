@@ -10,9 +10,16 @@ import com.mrfuzzihead.ic2tweaks.compat.waila.WailaIntegrationState;
 import com.mrfuzzihead.ic2tweaks.enet.EnetCableEffects;
 import com.mrfuzzihead.ic2tweaks.enet.EnetConductorRegistry;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackNetwork;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRefuelHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
@@ -31,8 +38,14 @@ public class IC2Tweaks {
     public static final String DEPENDENCIES = "required-after:IC2@2.2.828";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    @SidedProxy(
+        clientSide = "com.mrfuzzihead.ic2tweaks.client.ClientProxy",
+        serverSide = "com.mrfuzzihead.ic2tweaks.CommonProxy")
+    public static CommonProxy proxy;
+
     private final EnetConductorRegistry conductorRegistry = new EnetConductorRegistry();
     private final EnetCableEffects cableEffects = new EnetCableEffects(conductorRegistry);
+    private final JetpackHandler jetpackHandler = new JetpackHandler();
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
@@ -40,8 +53,23 @@ public class IC2Tweaks {
         // file first (it usually does).
         EnetOverloadConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         WrenchConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        JetpackConfig.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         LOG.info("Energy-net model: {}", EnetOverloadConfig.packetModel ? "packet (1.12.2-style)" : "legacy per-node");
         LOG.info("Lossless wrenching: {}", WrenchConfig.lossless);
+        LOG.info(
+            "Jetpack tweaks: {} (horizontal {} b/t, gas {}/{} mB/t, electric {}/{} EU/t)",
+            JetpackConfig.enabled ? "enabled" : "disabled",
+            JetpackConfig.horizontalSpeed,
+            JetpackConfig.gasFuelPerTick,
+            JetpackConfig.gasHoverFuelPerTick,
+            JetpackConfig.electricEuPerTick,
+            JetpackConfig.electricHoverEuPerTick);
+        if (JetpackConfig.isBaubleSlotEnabled()) {
+            LOG.info("Jetpack Baubles slots: {}", JetpackConfig.baubleSlotTypesCsv());
+        }
+        if (JetpackConfig.travellersGearSlot != JetpackConfig.TravellersGearSlot.OFF) {
+            LOG.info("Jetpack TravellersGear slot: {}", JetpackConfig.travellersGearSlot);
+        }
         if (WrenchConfig.lossless) {
             LOG.info(
                 "Lossless wrench cost: {} durability / {} EU",
@@ -49,12 +77,34 @@ public class IC2Tweaks {
                 WrenchConfig.electricEnergyCost);
         }
 
+        // Optional slot integrations. The compat classes reference the optional mods' APIs, so only load
+        // them when the mod is present; JetpackWorn itself stays free of those types.
+        if (Loader.isModLoaded("Baubles")) {
+            JetpackWorn.registerBaubles(new com.mrfuzzihead.ic2tweaks.jetpack.compat.BaublesCompat());
+        }
+        if (Loader.isModLoaded("TravellersGear")) {
+            JetpackWorn.registerTravellersGear(new com.mrfuzzihead.ic2tweaks.jetpack.compat.TravellersGearCompat());
+        }
+        JetpackNetwork.init();
+        MinecraftForge.EVENT_BUS.register(new JetpackRefuelHandler());
+
+        // The proxy is selected by FML: the client registers the renderer/HUD/tooltip handlers; the
+        // dedicated server never loads those classes.
+        proxy.preInit(event);
+
         // Cable meltdown / shocks are applied from a per-world tick pass (see EnetCableEffects); the
         // registry keeps track of the conductors IC2 has loaded.
         MinecraftForge.EVENT_BUS.register(conductorRegistry);
         FMLCommonHandler.instance()
             .bus()
             .register(cableEffects);
+
+        // The jetpack handler owns the tick, fuel accounting and client motion/audio. Register it on both
+        // buses: PlayerTickEvent lives on the FML bus, WorldEvent.Unload on the Forge bus.
+        FMLCommonHandler.instance()
+            .bus()
+            .register(jetpackHandler);
+        MinecraftForge.EVENT_BUS.register(jetpackHandler);
 
         if (Boolean.getBoolean("ic2tweaks.canary")) {
             FMLCommonHandler.instance()

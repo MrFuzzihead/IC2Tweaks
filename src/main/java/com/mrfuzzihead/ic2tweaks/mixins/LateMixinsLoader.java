@@ -14,6 +14,7 @@ import com.gtnewhorizon.gtnhmixins.builders.IMixins;
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
 import com.mrfuzzihead.ic2tweaks.WrenchConfig;
 import com.mrfuzzihead.ic2tweaks.enet.EnetOverloadConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
 
 /**
  * Late-mixin loader. IC2 is a regular mod, so the IC2 tweaks are late mixins.
@@ -36,6 +37,7 @@ public class LateMixinsLoader implements ILateMixinLoader {
         File configFile = new File(Launch.minecraftHome, "config/" + IC2Tweaks.MODID + ".cfg");
         EnetOverloadConfig.synchronizeConfiguration(configFile);
         WrenchConfig.synchronizeConfiguration(configFile);
+        JetpackConfig.synchronizeConfiguration(configFile);
         return IMixins.getLateMixins(Mixins.class, loadedMods);
     }
 }

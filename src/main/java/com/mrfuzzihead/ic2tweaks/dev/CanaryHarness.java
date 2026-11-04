@@ -2,26 +2,50 @@ package com.mrfuzzihead.ic2tweaks.dev;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.passive.EntityCow;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChunkCoordinates;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
+import com.mojang.authlib.GameProfile;
 import com.mrfuzzihead.ic2tweaks.IC2Tweaks;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackConfig;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackItem;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Kind;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Mode;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackPhysics.Motion;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRefuelHandler;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackRules;
+import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import ic2.api.energy.EnergyNet;
 import ic2.api.energy.NodeStats;
 import ic2.api.energy.tile.IEnergySink;
 import ic2.api.energy.tile.IEnergySource;
+import ic2.api.item.ElectricItem;
 import ic2.core.Ic2Items;
+import ic2.core.block.wiring.TileEntityChargepadBlock;
 import ic2.core.block.wiring.TileEntityElectricBlock;
 import ic2.core.block.wiring.TileEntityTransformer;
+import ic2.core.item.armor.ItemArmorJetpack;
+import ic2.core.item.armor.ItemArmorQuantumSuit;
+import ic2.core.util.StackUtil;
 
 /**
  * Temporary Phase-3 canary harness. Enabled with {@code -Dic2tweaks.canary=true}; builds four IC2 rigs in
@@ -38,6 +62,29 @@ public final class CanaryHarness {
     private boolean started;
     private boolean reported;
     private EntityCow shockCow;
+    private EntityPlayer jetpackPlayer;
+    private ItemStack jetpackStack;
+    private double jetpackChargeBefore;
+    private double jetpackChargeAfter;
+    private EntityPlayer baublesPlayer;
+    private double baublesChargeBefore;
+    private double baublesChargeAfter;
+    private EntityPlayer travellersGearPlayer;
+    private double travellersGearChargeBefore;
+    private double travellersGearChargeAfter;
+    private EntityPlayer quantumPlayer;
+    private ItemStack quantumStack;
+    private double quantumChargeBefore;
+    private double quantumChargeAfter;
+    private EntityPlayer chargepadPlayer;
+    private ItemStack chargepadStack;
+    private double chargepadChargeBefore;
+    private double chargepadChargeAfter;
+    private EntityPlayer refuelPlayer;
+    private ItemStack refuelStack;
+    private double refuelChargeBefore;
+    private double refuelChargeAfter;
+    private double powerOffDrained;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -111,6 +158,8 @@ public final class CanaryHarness {
         shockCow.setPosition(0.5D, Y, 18.5D);
         world.spawnEntityInWorld(shockCow);
 
+        buildJetpackProbe();
+
         if (mfsu1 == null || sink1 == null
             || mfsu2 == null
             || cable2 == null
@@ -124,6 +173,240 @@ public final class CanaryHarness {
             || sink4 == null) {
             failures.add("rig placement returned a null tile entity");
             IC2Tweaks.LOG.error("[canary] placement failed; see above");
+        }
+    }
+
+    private void buildJetpackProbe() {
+        try {
+            jetpackStack = makeJetpack();
+            jetpackPlayer = makePlayer("ic2tweaks_canary");
+            jetpackPlayer.inventory.armorInventory[2] = jetpackStack;
+            jetpackChargeBefore = charge(jetpackStack);
+
+            // Tick the real player object directly. The handler must drain hover fuel and reset fall
+            // distance; this exercises the mixin + handler, not just the pure maths.
+            tick(jetpackPlayer, 10);
+            jetpackChargeAfter = charge(jetpackStack);
+        } catch (Exception e) {
+            failures.add("jetpack probe: " + e);
+            IC2Tweaks.LOG.error("[canary] jetpack probe failed", e);
+        }
+        buildBaublesProbe();
+        buildTravellersGearProbe();
+        buildQuantumProbe();
+        buildChargepadProbe();
+        buildRefuelProbe();
+        buildPowerOffProbe();
+    }
+
+    private void buildPowerOffProbe() {
+        try {
+            ItemStack stack = makeJetpack();
+            JetpackItem.setPowerOff(stack, true);
+            EntityPlayer player = makePlayer("ic2tweaks_power_off");
+            player.inventory.armorInventory[2] = stack;
+            double before = JetpackItem.charge(stack);
+            JetpackHandler handler = new JetpackHandler();
+            TickEvent.PlayerTickEvent event = new TickEvent.PlayerTickEvent(TickEvent.Phase.START, player);
+            for (int i = 0; i < 10; i++) {
+                player.setPosition(6.5D, Y + 40.0D, 0.5D);
+                player.motionY = 0.0D;
+                player.onGround = false;
+                handler.onPlayerTick(event);
+            }
+            powerOffDrained = before - JetpackItem.charge(stack);
+        } catch (Exception e) {
+            failures.add("power-off probe: " + e);
+            IC2Tweaks.LOG.error("[canary] power-off probe failed", e);
+        }
+    }
+
+    private void buildRefuelProbe() {
+        if (!JetpackConfig.easyGasRefuel) {
+            return;
+        }
+        try {
+            refuelPlayer = makePlayer("ic2tweaks_refuel");
+            refuelStack = new ItemStack(Ic2Items.jetpack.getItem(), 1);
+            refuelPlayer.inventory.armorInventory[2] = refuelStack;
+            ItemStack cell = Ic2Items.biogasCell.copy();
+            refuelPlayer.inventory.mainInventory[0] = cell;
+            refuelPlayer.inventory.currentItem = 0;
+            refuelChargeBefore = JetpackItem.charge(refuelStack);
+            PlayerInteractEvent event = new PlayerInteractEvent(
+                refuelPlayer,
+                PlayerInteractEvent.Action.RIGHT_CLICK_AIR,
+                0,
+                0,
+                0,
+                0,
+                world);
+            new JetpackRefuelHandler().onPlayerInteract(event);
+            refuelChargeAfter = JetpackItem.charge(refuelStack);
+        } catch (Exception e) {
+            failures.add("refuel probe: " + e);
+            IC2Tweaks.LOG.error("[canary] refuel probe failed", e);
+        }
+    }
+
+    private void buildChargepadProbe() {
+        if (!JetpackConfig.chargepadChargesBaubles || !Loader.isModLoaded("Baubles")) {
+            return;
+        }
+        try {
+            TileEntity tile = place(Ic2Items.ChargepadbatBox, 3, 25);
+            if (!(tile instanceof TileEntityChargepadBlock)) {
+                failures.add("chargepad probe: tile is " + tile);
+                return;
+            }
+            TileEntityChargepadBlock pad = (TileEntityChargepadBlock) tile;
+            pad.onLoaded();
+            charge(pad, 100_000.0D, 1);
+
+            chargepadStack = Ic2Items.electricJetpack.copy();
+            chargepadPlayer = makePlayer("ic2tweaks_chargepad");
+            IInventory inventory = (IInventory) Class.forName("baubles.api.BaublesApi")
+                .getMethod("getBaubles", EntityPlayer.class)
+                .invoke(null, chargepadPlayer);
+            if (inventory == null) {
+                failures.add("chargepad probe: baubles inventory is null");
+                return;
+            }
+            inventory.setInventorySlotContents(3, chargepadStack);
+            chargepadChargeBefore = JetpackItem.charge(chargepadStack);
+            pad.playerstandsat(chargepadPlayer);
+            for (int i = 0; i < 40; i++) {
+                pad.updateEntity();
+            }
+            chargepadChargeAfter = JetpackItem.charge(chargepadStack);
+        } catch (Exception e) {
+            failures.add("chargepad probe: " + e);
+            IC2Tweaks.LOG.error("[canary] chargepad probe failed", e);
+        }
+    }
+
+    private void buildQuantumProbe() {
+        if (!JetpackConfig.tweakQuantumJetpack) {
+            return;
+        }
+        try {
+            quantumStack = Ic2Items.quantumBodyarmor.copy();
+            ElectricItem.manager.charge(quantumStack, 100_000.0D, 4, true, false);
+            StackUtil.getOrCreateNbtData(quantumStack)
+                .setBoolean("hoverMode", true);
+            quantumPlayer = makePlayer("ic2tweaks_quantum");
+            quantumPlayer.inventory.armorInventory[2] = quantumStack;
+            quantumChargeBefore = JetpackItem.charge(quantumStack);
+            JetpackHandler handler = new JetpackHandler();
+            TickEvent.PlayerTickEvent event = new TickEvent.PlayerTickEvent(TickEvent.Phase.START, quantumPlayer);
+            for (int i = 0; i < 10; i++) {
+                quantumPlayer.setPosition(6.5D, Y + 40.0D, 0.5D);
+                quantumPlayer.motionY = 0.0D;
+                quantumPlayer.onGround = false;
+                handler.onPlayerTick(event);
+            }
+            quantumChargeAfter = JetpackItem.charge(quantumStack);
+        } catch (Exception e) {
+            failures.add("quantum probe: " + e);
+            IC2Tweaks.LOG.error("[canary] quantum probe failed", e);
+        }
+    }
+
+    private void buildBaublesProbe() {
+        if (!Loader.isModLoaded("Baubles")) {
+            return;
+        }
+        try {
+            ItemStack stack = makeJetpack();
+            baublesPlayer = makePlayer("ic2tweaks_baubles");
+            IInventory inventory = (IInventory) Class.forName("baubles.api.BaublesApi")
+                .getMethod("getBaubles", EntityPlayer.class)
+                .invoke(null, baublesPlayer);
+            if (inventory == null) {
+                failures.add("baubles probe: inventory is null");
+                return;
+            }
+            inventory.setInventorySlotContents(3, stack);
+            baublesChargeBefore = charge(stack);
+            tick(baublesPlayer, 10);
+            baublesChargeAfter = charge(stack);
+        } catch (Exception e) {
+            failures.add("baubles probe: " + e);
+            IC2Tweaks.LOG.error("[canary] baubles probe failed", e);
+        }
+    }
+
+    private void buildTravellersGearProbe() {
+        if (!Loader.isModLoaded("TravellersGear")) {
+            return;
+        }
+        try {
+            ItemStack stack = makeJetpack();
+            travellersGearPlayer = makePlayer("ic2tweaks_tg");
+            Class<?> api = Class.forName("travellersgear.api.TravellersGearAPI");
+            ItemStack[] inventory = (ItemStack[]) api.getMethod("getExtendedInventory", EntityPlayer.class)
+                .invoke(null, travellersGearPlayer);
+            if (inventory == null || inventory.length == 0) {
+                failures.add("travellersgear probe: inventory is null");
+                return;
+            }
+            inventory[0] = stack;
+            api.getMethod("setExtendedInventory", EntityPlayer.class, ItemStack[].class)
+                .invoke(null, travellersGearPlayer, (Object) inventory);
+            travellersGearChargeBefore = charge(stack);
+            tick(travellersGearPlayer, 10);
+            travellersGearChargeAfter = charge(stack);
+        } catch (Exception e) {
+            failures.add("travellersgear probe: " + e);
+            IC2Tweaks.LOG.error("[canary] travellersgear probe failed", e);
+        }
+    }
+
+    private CanaryPlayer makePlayer(String name) {
+        return new CanaryPlayer(world, new GameProfile(UUID.randomUUID(), name));
+    }
+
+    private static ItemStack makeJetpack() {
+        ItemStack stack = Ic2Items.jetpack.copy();
+        ((ItemArmorJetpack) stack.getItem()).filltank(stack);
+        StackUtil.getOrCreateNbtData(stack)
+            .setBoolean("hoverMode", true);
+        return stack;
+    }
+
+    private void tick(EntityPlayer player, int ticks) {
+        for (int i = 0; i < ticks; i++) {
+            player.setPosition(6.5D, Y + 40.0D, 0.5D);
+            player.motionY = 0.0D;
+            player.onGround = false;
+            player.onUpdate();
+        }
+    }
+
+    private static double charge(ItemStack stack) {
+        return ((ItemArmorJetpack) stack.getItem()).getCharge(stack);
+    }
+
+    private static final class CanaryPlayer extends EntityPlayer {
+
+        CanaryPlayer(World world, GameProfile profile) {
+            super(world, profile);
+        }
+
+        @Override
+        public boolean canCommandSenderUseCommand(int permissionLevel, String command) {
+            return true;
+        }
+
+        @Override
+        public void addChatMessage(IChatComponent component) {}
+
+        @Override
+        public ChunkCoordinates getPlayerCoordinates() {
+            return new ChunkCoordinates(
+                MathHelper.floor_double(posX),
+                MathHelper.floor_double(posY),
+                MathHelper.floor_double(posZ));
         }
     }
 
@@ -150,6 +433,7 @@ public final class CanaryHarness {
     }
 
     private void report() {
+        reportJetpackPhysics();
         logStorage("S3 source A", world.getTileEntity(-1, Y, 12));
         logStorage("S3 source B", world.getTileEntity(1, Y, 12));
         logStorage("S3 sink", world.getTileEntity(0, Y, 12));
@@ -241,6 +525,154 @@ public final class CanaryHarness {
         } else {
             IC2Tweaks.LOG.error("[canary] RESULT: {} FAILURE(S): {}", failures.size(), failures);
         }
+    }
+
+    private void reportJetpackPhysics() {
+        double gasNormal = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.NORMAL, Kind.GAS, 1.0D));
+        double gasHover = JetpackPhysics.metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.HOVER, Kind.GAS, 1.0D));
+        double electricNormal = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.NORMAL, Kind.ELECTRIC, 0.7D));
+        double electricHover = JetpackPhysics
+            .metersPerSecond(JetpackPhysics.stockForwardSpeed(Mode.HOVER, Kind.ELECTRIC, 0.7D));
+        check("jetpack stock gas normal horizontal speed", approx(gasNormal, 0.533333D), "m/s=" + gasNormal);
+        check("jetpack stock gas hover horizontal speed", approx(gasHover, 3.555556D), "m/s=" + gasHover);
+        check(
+            "jetpack stock electric normal horizontal speed",
+            approx(electricNormal, 0.746667D),
+            "m/s=" + electricNormal);
+        check(
+            "jetpack stock electric hover horizontal speed",
+            approx(electricHover, 2.862222D),
+            "m/s=" + electricHover);
+
+        Motion motion = new Motion();
+        JetpackPhysics.applyHorizontal(motion, 1.0D, 0.0D, 0.0D, 0.32D, 1.0D, 0.08D, 0.8D, 0.6D, 1.0D);
+        check("jetpack configured horizontal target", approx(motion.z, 0.32D), "z=" + motion.z);
+        check(
+            "jetpack stock gas endurance",
+            approx(JetpackPhysics.secondsOfFlight(30000.0D, 2), 750.0D),
+            "seconds=" + JetpackPhysics.secondsOfFlight(30000.0D, 2));
+
+        check(
+            "jetpack hover idle on the ground does not thrust",
+            !JetpackRules.shouldThrust(false, true, true),
+            "hover\nonGround");
+        check("jetpack jump on the ground thrusts", JetpackRules.shouldThrust(true, false, true), "jump\nonGround");
+        check(
+            "jetpack riding blocks the jetpack",
+            !JetpackRules.canOperate(false, true, false, false, false, false, false),
+            "riding");
+        check("jetpack fuel boundary blocks thrust", !JetpackRules.canConsume(1.0D, 2), "charge=1 cost=2");
+        check(
+            "jetpack tick mixin applied",
+            hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$jetpackTickReplaced"),
+            "ItemArmorJetpack");
+        check(
+            "jetpack armor HUD mixin applied",
+            hasIc2TweaksMethod(EntityPlayer.class, "ic2tweaks$armorHudMixinApplied"),
+            "EntityPlayer");
+        if (JetpackConfig.tweakQuantumJetpack) {
+            check(
+                "jetpack quantum mixin applied",
+                hasIc2TweaksMethod(ItemArmorQuantumSuit.class, "ic2tweaks$quantumJetpackMixinApplied"),
+                "ItemArmorQuantumSuit");
+            if (quantumPlayer != null) {
+                check(
+                    "quantum chest wins over a bauble jetpack",
+                    JetpackWorn.get(quantumPlayer) == quantumStack,
+                    "resolver");
+                check(
+                    "fresh quantum chest auto-enables its jetpack",
+                    quantumStack.hasTagCompound() && quantumStack.getTagCompound()
+                        .getBoolean("jetpack"),
+                    "jetpack=false");
+                double drained = quantumChargeBefore - quantumChargeAfter;
+                check("quantum handler drains hover EU", drained >= 80.0D && drained <= 120.0D, "drained=" + drained);
+            }
+        }
+        if (JetpackConfig.chargepadChargesBaubles) {
+            check(
+                "jetpack chargepad mixin applied",
+                hasIc2TweaksMethod(TileEntityChargepadBlock.class, "ic2tweaks$chargepadMixinApplied"),
+                "TileEntityChargepadBlock");
+        }
+
+        if (jetpackPlayer == null) {
+            check("jetpack handler real-player probe", false, "player=null");
+        } else {
+            double drained = jetpackChargeBefore - jetpackChargeAfter;
+            check(
+                "jetpack handler drains hover fuel for a real player",
+                drained >= 8.0D && drained <= 10.0D,
+                "drained=" + drained);
+            check(
+                "jetpack handler keeps a real player's fall distance reset",
+                jetpackPlayer.fallDistance == 0.0F,
+                "fall=" + jetpackPlayer.fallDistance);
+        }
+        if (Loader.isModLoaded("Baubles")) {
+            check(
+                "jetpack bauble mixin applied",
+                hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleMixinApplied")
+                    || hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied"),
+                "Baubles");
+            if (jetpackStack != null
+                && hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$baubleExpandedMixinApplied")) {
+                try {
+                    String[] types = (String[]) ItemArmorJetpack.class.getMethod("getBaubleTypes", ItemStack.class)
+                        .invoke(jetpackStack.getItem(), jetpackStack);
+                    check(
+                        "jetpack exposes the wings bauble type",
+                        java.util.Arrays.asList(types)
+                            .contains("wings"),
+                        java.util.Arrays.toString(types));
+                } catch (Exception e) {
+                    failures.add("jetpack bauble types: " + e);
+                    IC2Tweaks.LOG.error("[canary] bauble types probe failed", e);
+                }
+            }
+        }
+        if (Loader.isModLoaded("TravellersGear")) {
+            check(
+                "jetpack travellersgear mixin applied",
+                hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied"),
+                "TravellersGear");
+        }
+        check("jetpack power switch blocks fuel drain", powerOffDrained == 0.0D, "drained=" + powerOffDrained);
+        if (refuelPlayer != null) {
+            double gained = refuelChargeAfter - refuelChargeBefore;
+            check("easy gas refuel fills a worn jetpack", gained > 0.0D, "gained=" + gained);
+        }
+        if (chargepadPlayer != null) {
+            double gained = chargepadChargeAfter - chargepadChargeBefore;
+            check("chargepad charges a Baubles-slot electric jetpack", gained > 0.0D, "gained=" + gained);
+        }
+        if (baublesPlayer != null) {
+            check(
+                "jetpack resolver drains a Baubles-slot jetpack",
+                baublesChargeBefore - baublesChargeAfter >= 8.0D,
+                "drained=" + (baublesChargeBefore - baublesChargeAfter));
+        }
+        if (travellersGearPlayer != null) {
+            check(
+                "jetpack resolver drains a TravellersGear-slot jetpack",
+                travellersGearChargeBefore - travellersGearChargeAfter >= 8.0D,
+                "drained=" + (travellersGearChargeBefore - travellersGearChargeAfter));
+        }
+    }
+
+    private static boolean hasIc2TweaksMethod(Class<?> clazz, String name) {
+        try {
+            clazz.getDeclaredMethod(name);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    private static boolean approx(double actual, double expected) {
+        return Math.abs(actual - expected) < 1.0E-5D;
     }
 
     private void logStorage(String name, TileEntity tile) {

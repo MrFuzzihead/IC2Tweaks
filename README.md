@@ -27,6 +27,17 @@ that changes to IC2 itself can be shipped and versioned independently.
   wrench use IC2's lossless path. The cost is balanced: normal wrenches pay 40 durability (4× the normal
   10) and electric wrenches pay 10,000 EU (IC2's native lossless cost, 200 damage × 50 EU).
   Blocks that already drop 100% of the time keep the normal 10-damage cost.
+- **Jetpack improvements (Phase 2/3)**: IC2's stock jetpack tick is replaced by a configurable flight
+  controller: full 8-direction horizontal flight with acceleration/braking and the IC2 boost key,
+  configurable hover/ascent, drain-before-thrust, guards for riding/creative flight/water/lava, a
+  per-player hover state that no longer depends on the old NBT sync, and a HUD fix that hides the
+  jetpack's fake 8 armour points. Stock jetpacks can also be worn in Baubles-Expanded `cape`/`wings`/`body`/`belt`
+  slots or the TravellersGear cloak/shoulder slot, with a rendered backpack. Phase 3 adds a compact
+  fuel/mode/speed/altitude HUD, localized fuel/mode/slot/controls tooltips, exhaust particles, chargepad
+  support for bauble/TG electric jetpacks, and optional quantum-chest integration. A chest jetpack always
+  wins over a bauble/TG jetpack. The flight pass also removes the arbitrary Y ceiling, adds soft-landing
+  assist, dedicated hover/power keys, easier gas refuelling and balanced electric defaults; see
+  `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
   (BatBox, CESU, MFE, MFSU, chargepads and addon storage) and for ordinary `TileEntityElectricMachine`
@@ -92,6 +103,8 @@ currently treated as storage (energy/tier/output) rather than a machine (buffer/
 | Minecraft Forge | 10.13.4.1614 | [Download](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.7.10.html) |
 | [IndustrialCraft²](https://www.curseforge.com/minecraft/mc-mods/industrial-craft) | 2.2.828-experimental | Required at runtime |
 | [UniMixins](https://github.com/GTNewHorizons/UniMixins) | any GTNH build | Required at runtime; pulled in automatically as a dependency |
+| [Baubles-Expanded](https://github.com/GTNewHorizons/Baubles-Expanded) | 2.2.27-GTNH | Optional: jetpack in a `cape`/`wings`/`body`/`belt` slot |
+| [TravellersGear](https://www.curseforge.com/minecraft/mc-mods/travellers-gear) | 1.16.x | Optional: jetpack in the cloak/shoulder slot |
 
 ## Configuration
 
@@ -163,6 +176,56 @@ Known limitations (a mix of pre-existing IC2 behaviour and documented port diver
   tin). Packet mode uses 1.12.2's 0.2 for tin regardless of insulation; the tooltip follows the active
   table.
 
+`jetpack` category (Phase 2/3: the flight tick, optional Baubles-Expanded/TravellersGear slots, HUD,
+tooltips and particles are active):
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `enableJetpackTweaks` | `true` | Master switch for the jetpack tweaks. Requires a restart |
+| `horizontalSpeed` | `0.32` | Target horizontal speed in blocks/tick while a movement key is held (about 6.4 m/s) |
+| `horizontalAccel` / `horizontalBrake` | `0.05` / `0.08` | How quickly horizontal velocity builds up / bleeds off, in blocks/tick per tick |
+| `strafeFactor` / `backwardFactor` | `0.8` / `0.6` | Sideways and backwards speed multipliers |
+| `boostMultiplier` / `boostFuelMultiplier` | `1.6` / `2.5` | IC2 boost-key speed and fuel multipliers |
+| `ascentSpeed` | `0.6` | Maximum normal ascent speed in blocks/tick (stock IC2 is 0.6 b/t) |
+| `hoverRise` / `hoverSink` / `hoverIdle` | `0.2` / `0.2` / `0.0` | Hover-mode vertical speeds in blocks/tick |
+| `electricHoverFactor` | `1.0` | Scales the electric jetpack's hover speeds; balanced parity with gas (stock 0.5) |
+| `electricPowerFactor` | `1.0` | Normal-mode lift/horizontal multiplier; balanced parity with gas (stock 0.7) |
+| `gasFuelPerTick` / `gasHoverFuelPerTick` | `2` / `1` | Biogas mB/tick in normal/hover mode |
+| `electricEuPerTick` / `electricHoverEuPerTick` | `4` / `2` | Balanced EU/tick for the electric jetpack (stock 8/7); half gas endurance but rechargeable |
+| `quantumEuPerTick` / `quantumHoverEuPerTick` | `8` / `10` | EU/tick for the integrated quantum chest in normal/hover mode |
+| `altitudeFadeBlocks` / `electricAltitudeFactor` | `0` / `1.28` | `0` removes the arbitrary Y ceiling; set 25 for IC2's stock fade/ceiling |
+| `baubleSlotTypes` | `cape,wings,body,belt` | Comma-separated Baubles slot types (cape/wings/body require Baubles-Expanded; belt works with original Baubles); `OFF` disables. The old `cape,body,belt` default is migrated to include wings. Requires a restart |
+| `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
+| `tweakQuantumJetpack` | `true` | Drive the quantum chest with the new controller (8/10 EU/t, same movement/HUD/particles). Set false for stock quantum behaviour; requires a restart |
+| `chargepadChargesBaubles` | `true` | Let chargepads charge an electric jetpack worn in a Baubles/TG slot. Requires a restart |
+| `slotFuelMultiplier` | `1.0` | Extra fuel multiplier while worn in a bauble/TG slot |
+| `allowInWater` / `allowInLava` | `false` | Allow thrust in water/lava |
+| `creativeNoDrain` / `fallProtection` | `true` / `false` | Creative no-drain; keep fall protection while charged |
+| `stripJetpackArmorDisplay` | `true` | Hide the misleading 8 HUD armour points the diamond-material jetpack shows despite 0 absorption |
+| `hudEnabled` / `hudCorner` | `true` / `TOP_LEFT` | Show the jetpack HUD and pick its corner (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`) |
+| `hudShowMode` | `false` | Show the Normal/Hover/Disabled mode line |
+| `hudShowSpeed` / `hudShowAltitude` | `false` / `false` | Add the horizontal-speed and Y-altitude lines to the HUD |
+| `hudLowFuelPercent` | `10` | Fuel percentage at/below which the HUD warns; 0 disables the warning |
+| `tooltipsEnabled` | `true` | Add localized fuel/charge, mode, worn-slot and controls lines to the jetpack tooltip |
+| `particlesEnabled` / `particleIntervalTicks` | `true` / `2` | Exhaust particles while thrusting, and the ticks between emissions (0 disables) |
+| `particleYOffset` | `0.75` | Height above the player's feet where exhaust spawns; lower it if the particles look too high |
+| `landingAssist` | `true` | Soft-landing braking near the ground when falling with a charged jetpack |
+| `landingAssistDistance` / `landingAssistSpeed` | `3.0` / `0.08` | Start height and maximum sink speed for landing assist |
+| `landingAssistDrain` | `true` | Consume hover fuel while landing assist brakes; empty/insufficient jetpacks fall normally |
+| `hoverMomentum` | `0.0` | Upward hover velocity carried after releasing jump; 0 stops immediately |
+| `pauseInGui` | `false` | Stop jetpack thrust/hover while a GUI is open (client-side pause) |
+| `dedicatedHoverKey` / `dedicatedPowerKey` | `true` / `true` | Enable the dedicated hover key (H) and jetpack power switch (J), both configurable in Controls |
+| `easyGasRefuel` | `true` | Right-click a biogas container to refill a worn gas jetpack |
+| `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
+
+**Quantum chest:** the integrated jetpack is part of the quantum chestplate (`quantumBodyarmor`), not a
+separate item. With `tweakQuantumJetpack=true` and a restart, wear the chest; a fresh chest auto-enables its
+jetpack, Boost + Mode toggles it, and Jump + Mode toggles hover.
+
+Old configs that still contain IC2's stock electric quartet (`8`/`7`/`0.7`/`0.5`) and
+`altitudeFadeBlocks=25` are migrated to the balanced/no-ceiling defaults on load. Partially customised
+values are left untouched.
+
 ## API
 
 Mods whose machines should survive (or shrink) an over-voltage packet can implement either interface on
@@ -177,7 +240,9 @@ Both mirror IC2 Experimental 1.12.2's interfaces of the same name.
 
 ## Diagnostics
 
-Run `/ic2tweaks status` in-game to confirm the feature is live. It reports:
+Run `/ic2tweaks status` in-game to confirm the energy-net and wrench features are live, or
+`/ic2tweaks jetpack` for the jetpack config, the tick/HUD/chargepad/quantum mixin markers and the
+stock/configured horizontal speeds. `status` reports:
 
 - `mixin active` — whether the energy-net mixins were actually applied to IC2
 - `wrench mixin active` — whether the wrench drop-rate mixin was applied, plus the `losslessWrench` value and its durability/EU costs
@@ -201,8 +266,13 @@ With packet mode enabled, run:
 JAVA_TOOL_OPTIONS="-Dic2tweaks.canary=true" ./gradlew runServer
 ```
 
-The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It is
-inactive unless the system property is set and is not part of normal gameplay.
+The harness builds IC2 test rigs at `y=160`, logs `[canary] PASS/FAIL`, and stops the server. It also
+checks the pure jetpack physics, the jetpack/HUD/chargepad/quantum mixin markers, and ticks a real
+`EntityPlayer` with a filled gas jetpack in hover mode to verify the handler drains fuel and resets fall
+distance. With Baubles loaded it also verifies the slot resolver, charges a bauble-slot electric jetpack
+from a real chargepad tile and refills an empty gas jetpack from a real biogas cell; with
+`tweakQuantumJetpack=true` it checks the quantum mixin, chest-wins resolver and a real quantum hover
+drain. It is inactive unless the system property is set and is not part of normal gameplay.
 
 ```bash
 git clone https://github.com/MrFuzzihead/IC2Tweaks.git

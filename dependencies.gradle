@@ -2,6 +2,11 @@ dependencies {
     api("net.industrial-craft:industrialcraft-2:2.2.828-experimental:dev")
     // Optional Waila integration (registered through Waila's IMC callback; not a runtime dependency).
     devOnlyNonPublishable("com.github.GTNewHorizons:waila:1.19.34:dev") { transitive = false }
+    // Optional jetpack slot integrations (compile + dev runtime only).
+    devOnlyNonPublishable("com.github.GTNewHorizons:Baubles-Expanded:2.2.27-GTNH:dev") { transitive = false }
+    // TravellersGear's CurseForge jar is reobfuscated, so keep it compile-only for the dev environment;
+    // production packs already ship the real jar.
+    compileOnly("curse.maven:travellers-gear-224440:2262112") { transitive = false }
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.162-GTNH:dev")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
