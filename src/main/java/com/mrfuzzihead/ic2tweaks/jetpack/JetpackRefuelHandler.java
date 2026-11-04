@@ -70,6 +70,7 @@ public final class JetpackRefuelHandler {
                     consumeHeld(player, held, empty);
                 }
             }
+            JetpackWorn.syncWorn(player, jetpackStack);
             event.setCanceled(true);
         }
     }

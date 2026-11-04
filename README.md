@@ -196,7 +196,7 @@ tooltips and particles are active):
 | `altitudeFadeBlocks` / `electricAltitudeFactor` | `0` / `1.28` | `0` removes the arbitrary Y ceiling; set 25 for IC2's stock fade/ceiling |
 | `baubleSlotTypes` | `cape,wings,body,belt` | Comma-separated Baubles slot types (cape/wings/body require Baubles-Expanded; belt works with original Baubles); `OFF` disables. The old `cape,body,belt` default is migrated to include wings. Requires a restart |
 | `travellersGearSlot` | `CLOAK` | `OFF`, `CLOAK` or `SHOULDERS`. Requires a restart |
-| `tweakQuantumJetpack` | `false` | Drive the quantum chest with the new controller (8/10 EU/t, same movement/HUD/particles). Requires a restart |
+| `tweakQuantumJetpack` | `true` | Drive the quantum chest with the new controller (8/10 EU/t, same movement/HUD/particles). Set false for stock quantum behaviour; requires a restart |
 | `chargepadChargesBaubles` | `true` | Let chargepads charge an electric jetpack worn in a Baubles/TG slot. Requires a restart |
 | `slotFuelMultiplier` | `1.0` | Extra fuel multiplier while worn in a bauble/TG slot |
 | `allowInWater` / `allowInLava` | `false` | Allow thrust in water/lava |
@@ -210,11 +210,16 @@ tooltips and particles are active):
 | `particleYOffset` | `0.75` | Height above the player's feet where exhaust spawns; lower it if the particles look too high |
 | `landingAssist` | `true` | Soft-landing braking near the ground when falling with a charged jetpack |
 | `landingAssistDistance` / `landingAssistSpeed` | `3.0` / `0.08` | Start height and maximum sink speed for landing assist |
+| `landingAssistDrain` | `true` | Consume hover fuel while landing assist brakes; empty/insufficient jetpacks fall normally |
 | `hoverMomentum` | `0.0` | Upward hover velocity carried after releasing jump; 0 stops immediately |
 | `pauseInGui` | `false` | Stop jetpack thrust/hover while a GUI is open (client-side pause) |
 | `dedicatedHoverKey` | `true` | Enable the dedicated hover key (default H, configurable in Controls) |
 | `easyGasRefuel` | `true` | Right-click a biogas container to refill a worn gas jetpack |
 | `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
+
+**Quantum chest:** the integrated jetpack is part of the quantum chestplate (`quantumBodyarmor`), not a
+separate item. With `tweakQuantumJetpack=true` and a restart, wear the chest; a fresh chest auto-enables its
+jetpack, Boost + Mode toggles it, and Jump + Mode toggles hover.
 
 Old configs that still contain IC2's stock electric quartet (`8`/`7`/`0.7`/`0.5`) and
 `altitudeFadeBlocks=25` are migrated to the balanced/no-ceiling defaults on load. Partially customised

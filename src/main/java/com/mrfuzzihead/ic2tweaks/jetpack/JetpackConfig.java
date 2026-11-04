@@ -32,8 +32,8 @@ public final class JetpackConfig {
      */
     public static boolean tweakAddonJetpacks = false;
 
-    /** Apply the new flight model to the quantum suit's integrated jetpack. Off by default. */
-    public static boolean tweakQuantumJetpack = false;
+    /** Apply the new flight model to the quantum suit's integrated jetpack. Default on. */
+    public static boolean tweakQuantumJetpack = true;
 
     // ---------------------------------------------------------------------------------------------
     // Horizontal flight (blocks per tick; 20 ticks = 1 second, so 0.32 b/t = 6.4 m/s)
@@ -206,6 +206,9 @@ public final class JetpackConfig {
     /** Maximum downward speed while landing assist is active, in blocks per tick. */
     public static float landingAssistSpeed = 0.08F;
 
+    /** Consume hover fuel/charge while landing assist is braking a fall; empty jetpacks cannot assist. */
+    public static boolean landingAssistDrain = true;
+
     /** How much upward hover velocity carries over after releasing jump. 0 stops immediately. */
     public static float hoverMomentum = 0.0F;
 
@@ -330,9 +333,9 @@ public final class JetpackConfig {
         tweakQuantumJetpack = configuration.getBoolean(
             "tweakQuantumJetpack",
             CATEGORY,
-            false,
-            "Apply the new flight model to the quantum suit's integrated jetpack. Off by default; the quantum "
-                + "suit has very different fuel numbers (10,000,000 EU).");
+            true,
+            "Apply the new flight model to the quantum suit's integrated jetpack. Default true; set false to "
+                + "leave the stock quantum chest tick untouched. Requires a restart.");
 
         horizontalSpeed = configuration.getFloat(
             "horizontalSpeed",
@@ -628,6 +631,13 @@ public final class JetpackConfig {
             0.01F,
             0.5F,
             "Maximum downward speed while landing assist is active, in blocks per tick.");
+
+        landingAssistDrain = configuration.getBoolean(
+            "landingAssistDrain",
+            CATEGORY,
+            true,
+            "Consume hover fuel/charge while landing assist is braking a fall; an empty jetpack cannot "
+                + "assist and falls normally.");
 
         hoverMomentum = configuration.getFloat(
             "hoverMomentum",

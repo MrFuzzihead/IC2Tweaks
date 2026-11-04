@@ -28,6 +28,9 @@ public final class JetpackWorn {
     public interface SlotProvider {
 
         ItemStack findWorn(EntityPlayer player);
+
+        /** Push a changed stack back to the client. Server side only. */
+        default void sync(EntityPlayer player, ItemStack stack) {}
     }
 
     private static SlotProvider baublesProvider;
@@ -103,6 +106,26 @@ public final class JetpackWorn {
     /** @return the jetpack worn in the TravellersGear slot, or {@code null}. */
     public static ItemStack getTravellersGear(EntityPlayer player) {
         return travellersGearProvider != null ? travellersGearProvider.findWorn(player) : null;
+    }
+
+    /**
+     * Push a changed worn stack to the client. The chest slot uses the normal inventory sync; the optional
+     * slot mods are responsible for their own packet (a chargepad/refuel changes their inventory directly).
+     */
+    public static void syncWorn(EntityPlayer player, ItemStack stack) {
+        if (player == null || stack == null || player.worldObj.isRemote) {
+            return;
+        }
+        player.inventoryContainer.detectAndSendChanges();
+        if (isChestSlot(player, stack)) {
+            return;
+        }
+        if (baublesProvider != null && baublesProvider.findWorn(player) == stack) {
+            baublesProvider.sync(player, stack);
+        }
+        if (travellersGearProvider != null && travellersGearProvider.findWorn(player) == stack) {
+            travellersGearProvider.sync(player, stack);
+        }
     }
 
     /** @return whether the stack is the one currently worn in the chest slot. */

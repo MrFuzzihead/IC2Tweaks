@@ -57,7 +57,7 @@ class JetpackConfigTest {
     void defaultsMatchTheDesign() {
         assertTrue(JetpackConfig.enabled);
         assertFalse(JetpackConfig.tweakAddonJetpacks);
-        assertFalse(JetpackConfig.tweakQuantumJetpack);
+        assertTrue(JetpackConfig.tweakQuantumJetpack);
 
         assertEquals(0.32F, JetpackConfig.horizontalSpeed, 1.0E-6F);
         assertEquals(0.05F, JetpackConfig.horizontalAccel, 1.0E-6F);
@@ -104,6 +104,7 @@ class JetpackConfigTest {
         assertTrue(JetpackConfig.landingAssist);
         assertEquals(3.0F, JetpackConfig.landingAssistDistance, 1.0E-6F);
         assertEquals(0.08F, JetpackConfig.landingAssistSpeed, 1.0E-6F);
+        assertTrue(JetpackConfig.landingAssistDrain);
         assertEquals(0.0F, JetpackConfig.hoverMomentum, 1.0E-6F);
         assertFalse(JetpackConfig.pauseInGui);
         assertTrue(JetpackConfig.dedicatedHoverKey);

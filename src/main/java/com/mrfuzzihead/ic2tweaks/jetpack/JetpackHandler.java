@@ -64,6 +64,13 @@ public final class JetpackHandler {
             // Stock quantum extinguishes the player every chest tick; its onArmorTick is cancelled for
             // the integrated controller, so keep that behaviour here.
             player.extinguish();
+            // A fresh quantum chest ships with jetpack=false in stock IC2. With the integration enabled,
+            // enable it once so the chest works immediately; a player can still toggle it off later.
+            if (!stack.hasTagCompound() || !stack.getTagCompound()
+                .hasKey("jetpack")) {
+                StackUtil.getOrCreateNbtData(stack)
+                    .setBoolean("jetpack", true);
+            }
         }
 
         if (JetpackConfig.pauseInGui && JetpackGuiState.guiOpen) {
@@ -168,22 +175,53 @@ public final class JetpackHandler {
             return;
         }
 
+        boolean hover = state.hoverMode;
+        boolean engaged = jump || hover;
+
         // Soft landing: brake a fall near the ground even when the player is not holding jump. This runs
         // before the engaged check so it also helps a player who is simply falling with a charged jetpack.
-        if (JetpackConfig.landingAssist && JetpackRules.shouldLandingAssist(
-            player.motionY,
-            player.onGround,
-            player.capabilities.isFlying,
-            player.isRiding(),
-            player.isInWater(),
-            player.handleLavaMovement())) {
+        if (!engaged && JetpackConfig.landingAssist
+            && JetpackRules.shouldLandingAssist(
+                player.motionY,
+                player.onGround,
+                player.capabilities.isFlying,
+                player.isRiding(),
+                player.isInWater(),
+                player.handleLavaMovement())) {
             int groundY = player.worldObj
                 .getHeightValue(MathHelper.floor_double(player.posX), MathHelper.floor_double(player.posZ));
             if (JetpackRules.withinLandingRange(player.posY, groundY, JetpackConfig.landingAssistDistance)) {
-                if (client) {
-                    player.motionY = Math.max(player.motionY, -JetpackConfig.landingAssistSpeed);
+                boolean paid = true;
+                boolean drain = !(player.capabilities.isCreativeMode && JetpackConfig.creativeNoDrain);
+                if (drain && JetpackConfig.landingAssistDrain) {
+                    int landingCost = JetpackPhysics.fuelCost(
+                        kind,
+                        true,
+                        false,
+                        JetpackConfig.gasFuelPerTick,
+                        JetpackConfig.gasHoverFuelPerTick,
+                        quantum ? JetpackConfig.quantumEuPerTick : JetpackConfig.electricEuPerTick,
+                        quantum ? JetpackConfig.quantumHoverEuPerTick : JetpackConfig.electricHoverEuPerTick,
+                        JetpackConfig.boostFuelMultiplier);
+                    if (!JetpackWorn.isChestSlot(player, stack)) {
+                        landingCost = (int) Math.ceil(landingCost * JetpackConfig.slotFuelMultiplier);
+                    }
+                    paid = JetpackRules.canConsume(charge, landingCost)
+                        && JetpackItem.consume(player, stack, landingCost);
+                    if (paid && !client
+                        && JetpackConfig.syncIntervalTicks > 0
+                        && JetpackWorn.isChestSlot(player, stack)
+                        && ++state.syncCounter >= JetpackConfig.syncIntervalTicks) {
+                        player.inventoryContainer.detectAndSendChanges();
+                        state.syncCounter = 0;
+                    }
                 }
-                player.fallDistance = 0.0F;
+                if (paid) {
+                    if (client) {
+                        player.motionY = Math.max(player.motionY, -JetpackConfig.landingAssistSpeed);
+                    }
+                    player.fallDistance = 0.0F;
+                }
             }
         }
 
@@ -192,8 +230,6 @@ public final class JetpackHandler {
             player.fallDistance = 0.0F;
         }
 
-        boolean hover = state.hoverMode;
-        boolean engaged = jump || hover;
         if (!engaged || !JetpackRules.shouldThrust(jump, hover, player.onGround)) {
             state.stopAudio();
             state.thrusting = false;

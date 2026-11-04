@@ -269,8 +269,6 @@ public final class CanaryHarness {
             quantumStack = Ic2Items.quantumBodyarmor.copy();
             ElectricItem.manager.charge(quantumStack, 100_000.0D, 4, true, false);
             StackUtil.getOrCreateNbtData(quantumStack)
-                .setBoolean("jetpack", true);
-            StackUtil.getOrCreateNbtData(quantumStack)
                 .setBoolean("hoverMode", true);
             quantumPlayer = makePlayer("ic2tweaks_quantum");
             quantumPlayer.inventory.armorInventory[2] = quantumStack;
@@ -560,6 +558,11 @@ public final class CanaryHarness {
                     "quantum chest wins over a bauble jetpack",
                     JetpackWorn.get(quantumPlayer) == quantumStack,
                     "resolver");
+                check(
+                    "fresh quantum chest auto-enables its jetpack",
+                    quantumStack.hasTagCompound() && quantumStack.getTagCompound()
+                        .getBoolean("jetpack"),
+                    "jetpack=false");
                 double drained = quantumChargeBefore - quantumChargeAfter;
                 check("quantum handler drains hover EU", drained >= 80.0D && drained <= 120.0D, "drained=" + drained);
             }

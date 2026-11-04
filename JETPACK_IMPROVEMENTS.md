@@ -446,7 +446,7 @@ stripJetpackArmorDisplay
 hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
 hudShowSpeed, hudShowAltitude, hudLowFuelPercent
 tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset,
-landingAssist, landingAssistDistance, landingAssistSpeed, hoverMomentum,
+landingAssist, landingAssistDistance, landingAssistSpeed, landingAssistDrain, hoverMomentum,
 pauseInGui, dedicatedHoverKey, easyGasRefuel
 chargepadChargesBaubles
 tweakQuantumJetpack, quantumEuPerTick, quantumHoverEuPerTick
@@ -536,12 +536,12 @@ mods.
   tier (advanced tooltips) and controls. IC2's raw `<fluid, amount mB>` gas line is replaced.
 - [x] Exhaust particles (`JetpackParticles`): client-only smoke for gas / flame for electric, with a
   configurable interval and extra puffs on boost.
-- [x] Optional quantum-chest controller mixin (`tweakQuantumJetpack`, default off): cancels the stock
+- [x] Optional quantum-chest controller mixin (`tweakQuantumJetpack`, default on): cancels the stock
   chest tick/`useJetpack` and routes movement, hover/enable toggles, drain, HUD/tooltip and particles
   through the common handler. Other quantum pieces keep their stock ticks.
 - [x] Chargepad support for an electric jetpack in a Baubles/TG slot (`chargepadChargesBaubles`).
 - [x] Double-jetpack policy: chest (stock/quantum/GraviSuite) wins over a bauble/TG jetpack.
-- [x] Soft-landing assist (`landingAssist`, distance/speed), configurable hover carry-over
+- [x] Soft-landing assist (`landingAssist`, distance/speed/drain), configurable hover carry-over
   (`hoverMomentum`), GUI pause (`pauseInGui`), dedicated hover key (`dedicatedHoverKey`), and easy gas
   refuelling from a biogas container (`easyGasRefuel`).
 - [x] Removed the arbitrary gas/electric Y ceiling: `altitudeFadeBlocks=0` disables the fade and the
@@ -689,7 +689,7 @@ src/test/java/com/mrfuzzihead/ic2tweaks/jetpack/
 4. **TG slot**: **resolved** - default CLOAK (back), configurable to SHOULDERS/OFF.
 5. **Balance**: **resolved** - electric defaults now match gas lift/hover and use 4/2 EU/t (half gas
    endurance, rechargeable). Old stock configs are migrated; partial custom values are preserved.
-6. **Quantum suit**: **resolved** - implemented as `tweakQuantumJetpack` (default off, restart required),
+6. **Quantum suit**: **resolved** - implemented as `tweakQuantumJetpack` (default on, restart required),
    with its own 8/10 EU/t values and the stock jetpack-enable toggle preserved.
 7. **Sync strategy**: client simulation by default (`syncIntervalTicks=0`); a low-frequency authoritative
    sync is available for GUIs. Confirm in the manual latency test.

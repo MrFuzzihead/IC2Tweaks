@@ -7,6 +7,7 @@ import net.minecraft.item.ItemStack;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 
 import baubles.api.BaublesApi;
+import baubles.common.container.InventoryBaubles;
 
 /**
  * Baubles/Expanded slot resolver. This class is only loaded when the Baubles mod is present (see
@@ -27,5 +28,19 @@ public final class BaublesCompat implements JetpackWorn.SlotProvider {
             }
         }
         return null;
+    }
+
+    @Override
+    public void sync(EntityPlayer player, ItemStack stack) {
+        IInventory inventory = BaublesApi.getBaubles(player);
+        if (!(inventory instanceof InventoryBaubles)) {
+            return;
+        }
+        for (int slot = 0; slot < inventory.getSizeInventory(); slot++) {
+            if (inventory.getStackInSlot(slot) == stack) {
+                ((InventoryBaubles) inventory).syncSlotToClients(slot);
+                return;
+            }
+        }
     }
 }

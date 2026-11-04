@@ -50,6 +50,7 @@ public abstract class MixinTileEntityChargepadBlock {
     private void chargeJetpack(ItemStack stack, int limit) {
         if (JetpackWorn.isStockJetpack(stack) && JetpackItem.isElectric(stack)) {
             chargeitems(stack, limit);
+            JetpackWorn.syncWorn(player, stack);
         }
     }
 
