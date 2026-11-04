@@ -13,24 +13,35 @@ import com.mrfuzzihead.ic2tweaks.jetpack.JetpackItem;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackNetwork;
 import com.mrfuzzihead.ic2tweaks.jetpack.JetpackWorn;
 import com.mrfuzzihead.ic2tweaks.jetpack.ToggleHoverMessage;
+import com.mrfuzzihead.ic2tweaks.jetpack.TogglePowerMessage;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
 import ic2.core.util.StackUtil;
 
-/** Dedicated hover key. The key is registered in Controls and can be disabled by config. */
+/** Dedicated hover and power keys; both are configurable in Controls. */
 public final class JetpackKeyHandler {
 
-    private final KeyBinding key = new KeyBinding("key.ic2tweaks.hover", Keyboard.KEY_H, "key.categories.ic2tweaks");
+    private final KeyBinding hoverKey = new KeyBinding(
+        "key.ic2tweaks.hover",
+        Keyboard.KEY_H,
+        "key.categories.ic2tweaks");
+    private final KeyBinding powerKey = new KeyBinding(
+        "key.ic2tweaks.power",
+        Keyboard.KEY_J,
+        "key.categories.ic2tweaks");
 
     public JetpackKeyHandler() {
-        ClientRegistry.registerKeyBinding(key);
+        ClientRegistry.registerKeyBinding(hoverKey);
+        ClientRegistry.registerKeyBinding(powerKey);
     }
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
-        if (!JetpackConfig.enabled || !JetpackConfig.dedicatedHoverKey || !key.getIsKeyPressed()) {
+        boolean hoverPressed = JetpackConfig.dedicatedHoverKey && hoverKey.getIsKeyPressed();
+        boolean powerPressed = JetpackConfig.dedicatedPowerKey && powerKey.getIsKeyPressed();
+        if (!JetpackConfig.enabled || !hoverPressed && !powerPressed) {
             return;
         }
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
@@ -41,9 +52,15 @@ public final class JetpackKeyHandler {
         if (!JetpackItem.isSupported(stack)) {
             return;
         }
-        NBTTagCompound tag = StackUtil.getOrCreateNbtData(stack);
-        tag.setBoolean("hoverMode", !tag.getBoolean("hoverMode"));
-        tag.setByte("toggleTimer", (byte) 10);
-        JetpackNetwork.INSTANCE.sendToServer(new ToggleHoverMessage());
+        if (hoverPressed) {
+            NBTTagCompound tag = StackUtil.getOrCreateNbtData(stack);
+            tag.setBoolean("hoverMode", !tag.getBoolean("hoverMode"));
+            tag.setByte("toggleTimer", (byte) 10);
+            JetpackNetwork.INSTANCE.sendToServer(new ToggleHoverMessage());
+        }
+        if (powerPressed) {
+            JetpackItem.setPowerOff(stack, !JetpackItem.isPowerOff(stack));
+            JetpackNetwork.INSTANCE.sendToServer(new TogglePowerMessage());
+        }
     }
 }

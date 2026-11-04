@@ -444,10 +444,10 @@ altitudeFadeBlocks, electricAltitudeFactor
 allowInWater, allowInLava, creativeNoDrain, fallProtection,
 stripJetpackArmorDisplay
 hudEnabled, hudCorner (TOP_LEFT/TOP_RIGHT/BOTTOM_LEFT/BOTTOM_RIGHT),
-hudShowSpeed, hudShowAltitude, hudLowFuelPercent
+hudShowMode, hudShowSpeed, hudShowAltitude, hudLowFuelPercent
 tooltipsEnabled, particlesEnabled, particleIntervalTicks, particleYOffset,
 landingAssist, landingAssistDistance, landingAssistSpeed, landingAssistDrain, hoverMomentum,
-pauseInGui, dedicatedHoverKey, easyGasRefuel
+pauseInGui, dedicatedHoverKey, dedicatedPowerKey, easyGasRefuel
 chargepadChargesBaubles
 tweakQuantumJetpack, quantumEuPerTick, quantumHoverEuPerTick
 baubleSlotTypes (cape,wings,body,belt / OFF), travellersGearSlot (OFF/CLOAK/SHOULDERS),
@@ -542,8 +542,9 @@ mods.
 - [x] Chargepad support for an electric jetpack in a Baubles/TG slot (`chargepadChargesBaubles`).
 - [x] Double-jetpack policy: chest (stock/quantum/GraviSuite) wins over a bauble/TG jetpack.
 - [x] Soft-landing assist (`landingAssist`, distance/speed/drain), configurable hover carry-over
-  (`hoverMomentum`), GUI pause (`pauseInGui`), dedicated hover key (`dedicatedHoverKey`), and easy gas
-  refuelling from a biogas container (`easyGasRefuel`).
+  (`hoverMomentum`), GUI pause (`pauseInGui`), dedicated hover key (`dedicatedHoverKey`), per-stack power
+  switch (`dedicatedPowerKey`, namespaced `ic2tweaks:disabled`), and easy gas refuelling from a biogas
+  container (`easyGasRefuel`).
 - [x] Removed the arbitrary gas/electric Y ceiling: `altitudeFadeBlocks=0` disables the fade and the
   electric 200-block ceiling; set 25 to restore stock behaviour.
 - [x] Balanced electric defaults: gas-parity lift/hover speed and 4/2 EU/t (stock 8/7), i.e. half the gas

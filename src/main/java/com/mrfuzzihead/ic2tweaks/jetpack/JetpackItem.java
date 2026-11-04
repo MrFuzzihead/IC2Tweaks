@@ -17,7 +17,23 @@ import ic2.core.item.armor.ItemArmorQuantumSuit;
  */
 public final class JetpackItem {
 
+    /** Namespaced NBT flag for the per-stack power switch. */
+    public static final String NBT_POWER_OFF = "ic2tweaks:disabled";
+
     private JetpackItem() {}
+
+    public static boolean isPowerOff(ItemStack stack) {
+        return stack != null && stack.hasTagCompound()
+            && stack.getTagCompound()
+                .getBoolean(NBT_POWER_OFF);
+    }
+
+    public static void setPowerOff(ItemStack stack, boolean off) {
+        if (stack != null) {
+            net.minecraft.nbt.NBTTagCompound tag = ic2.core.util.StackUtil.getOrCreateNbtData(stack);
+            tag.setBoolean(NBT_POWER_OFF, off);
+        }
+    }
 
     /** Jetpack items that the flight controller may tick. */
     public static boolean isSupported(ItemStack stack) {

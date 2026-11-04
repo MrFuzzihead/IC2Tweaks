@@ -50,21 +50,26 @@ public final class JetpackHudOverlay {
         boolean warn = JetpackConfig.hudLowFuelPercent > 0;
         boolean low = JetpackReadout.lowFuel(percent, JetpackConfig.hudLowFuelPercent);
         boolean empty = warn && percent == 0;
+        boolean powerOff = JetpackItem.isPowerOff(stack);
         boolean quantum = JetpackItem.isQuantumJetpack(stack);
         boolean enabled = !quantum || stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("jetpack");
         boolean hover = stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("hoverMode");
 
-        String warning = !warn ? ""
-            : empty ? " " + StatCollector.translateToLocal("ic2tweaks.jetpack.hud.empty")
-                : low ? " " + StatCollector.translateToLocal("ic2tweaks.jetpack.hud.low") : "";
+        String warning = powerOff ? " " + StatCollector.translateToLocal("ic2tweaks.jetpack.hud.off")
+            : !warn ? ""
+                : empty ? " " + StatCollector.translateToLocal("ic2tweaks.jetpack.hud.empty")
+                    : low ? " " + StatCollector.translateToLocal("ic2tweaks.jetpack.hud.low") : "";
         String line1 = StatCollector.translateToLocalFormatted("ic2tweaks.jetpack.hud.fuel", percent) + warning;
 
         List<String> parts = new ArrayList<>();
-        parts.add(
-            StatCollector
-                .translateToLocal(hover ? "ic2tweaks.jetpack.hud.mode.hover" : "ic2tweaks.jetpack.hud.mode.normal"));
+        if (JetpackConfig.hudShowMode) {
+            parts.add(
+                StatCollector.translateToLocal(
+                    !enabled ? "ic2tweaks.jetpack.hud.disabled"
+                        : hover ? "ic2tweaks.jetpack.hud.mode.hover" : "ic2tweaks.jetpack.hud.mode.normal"));
+        }
         if (JetpackConfig.hudShowSpeed) {
             parts.add(
                 StatCollector.translateToLocalFormatted(
@@ -114,7 +119,8 @@ public final class JetpackHudOverlay {
         }
 
         Gui.drawRect(x - 3, y - 3, x + width + 3, y + lines.size() * LINE_HEIGHT + 1, BACKGROUND);
-        mc.fontRenderer.drawStringWithShadow(line1, x, y, warn && (low || empty) ? 0xFF5555 : 0xFFFFFF);
+        mc.fontRenderer
+            .drawStringWithShadow(line1, x, y, powerOff ? 0xAAAAAA : warn && (low || empty) ? 0xFF5555 : 0xFFFFFF);
         if (lines.size() > 1) {
             mc.fontRenderer
                 .drawStringWithShadow(line2, x, y + LINE_HEIGHT, !enabled ? 0xAAAAAA : hover ? 0x55FFFF : 0xAAAAAA);

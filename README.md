@@ -36,7 +36,7 @@ that changes to IC2 itself can be shipped and versioned independently.
   fuel/mode/speed/altitude HUD, localized fuel/mode/slot/controls tooltips, exhaust particles, chargepad
   support for bauble/TG electric jetpacks, and optional quantum-chest integration. A chest jetpack always
   wins over a bauble/TG jetpack. The flight pass also removes the arbitrary Y ceiling, adds soft-landing
-  assist, a dedicated hover key, easier gas refuelling and balanced electric defaults; see
+  assist, dedicated hover/power keys, easier gas refuelling and balanced electric defaults; see
   `JETPACK_IMPROVEMENTS.md`.
 - **Optional Waila/Wawla support for base IC2**: Waila's built-in IC2 addon only covers generators, and
   Wawla has no IC2 module at all. IC2Tweaks registers a Waila provider for every `IEnergyStorage`
@@ -203,7 +203,8 @@ tooltips and particles are active):
 | `creativeNoDrain` / `fallProtection` | `true` / `false` | Creative no-drain; keep fall protection while charged |
 | `stripJetpackArmorDisplay` | `true` | Hide the misleading 8 HUD armour points the diamond-material jetpack shows despite 0 absorption |
 | `hudEnabled` / `hudCorner` | `true` / `TOP_LEFT` | Show the jetpack HUD and pick its corner (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`) |
-| `hudShowSpeed` / `hudShowAltitude` | `true` / `true` | Add the horizontal-speed and Y-altitude lines to the HUD |
+| `hudShowMode` | `false` | Show the Normal/Hover/Disabled mode line |
+| `hudShowSpeed` / `hudShowAltitude` | `false` / `false` | Add the horizontal-speed and Y-altitude lines to the HUD |
 | `hudLowFuelPercent` | `10` | Fuel percentage at/below which the HUD warns; 0 disables the warning |
 | `tooltipsEnabled` | `true` | Add localized fuel/charge, mode, worn-slot and controls lines to the jetpack tooltip |
 | `particlesEnabled` / `particleIntervalTicks` | `true` / `2` | Exhaust particles while thrusting, and the ticks between emissions (0 disables) |
@@ -213,7 +214,7 @@ tooltips and particles are active):
 | `landingAssistDrain` | `true` | Consume hover fuel while landing assist brakes; empty/insufficient jetpacks fall normally |
 | `hoverMomentum` | `0.0` | Upward hover velocity carried after releasing jump; 0 stops immediately |
 | `pauseInGui` | `false` | Stop jetpack thrust/hover while a GUI is open (client-side pause) |
-| `dedicatedHoverKey` | `true` | Enable the dedicated hover key (default H, configurable in Controls) |
+| `dedicatedHoverKey` / `dedicatedPowerKey` | `true` / `true` | Enable the dedicated hover key (H) and jetpack power switch (J), both configurable in Controls |
 | `easyGasRefuel` | `true` | Right-click a biogas container to refill a worn gas jetpack |
 | `syncIntervalTicks` | `0` | Extra server-to-client fuel sync interval; 0 means client simulation only |
 

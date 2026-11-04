@@ -13,5 +13,6 @@ public final class JetpackNetwork {
 
     public static void init() {
         INSTANCE.registerMessage(ToggleHoverMessage.Handler.class, ToggleHoverMessage.class, 0, Side.SERVER);
+        INSTANCE.registerMessage(TogglePowerMessage.Handler.class, TogglePowerMessage.class, 1, Side.SERVER);
     }
 }

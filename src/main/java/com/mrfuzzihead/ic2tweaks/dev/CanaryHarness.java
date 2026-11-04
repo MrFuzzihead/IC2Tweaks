@@ -84,6 +84,7 @@ public final class CanaryHarness {
     private ItemStack refuelStack;
     private double refuelChargeBefore;
     private double refuelChargeAfter;
+    private double powerOffDrained;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -195,6 +196,29 @@ public final class CanaryHarness {
         buildQuantumProbe();
         buildChargepadProbe();
         buildRefuelProbe();
+        buildPowerOffProbe();
+    }
+
+    private void buildPowerOffProbe() {
+        try {
+            ItemStack stack = makeJetpack();
+            JetpackItem.setPowerOff(stack, true);
+            EntityPlayer player = makePlayer("ic2tweaks_power_off");
+            player.inventory.armorInventory[2] = stack;
+            double before = JetpackItem.charge(stack);
+            JetpackHandler handler = new JetpackHandler();
+            TickEvent.PlayerTickEvent event = new TickEvent.PlayerTickEvent(TickEvent.Phase.START, player);
+            for (int i = 0; i < 10; i++) {
+                player.setPosition(6.5D, Y + 40.0D, 0.5D);
+                player.motionY = 0.0D;
+                player.onGround = false;
+                handler.onPlayerTick(event);
+            }
+            powerOffDrained = before - JetpackItem.charge(stack);
+        } catch (Exception e) {
+            failures.add("power-off probe: " + e);
+            IC2Tweaks.LOG.error("[canary] power-off probe failed", e);
+        }
     }
 
     private void buildRefuelProbe() {
@@ -615,6 +639,7 @@ public final class CanaryHarness {
                 hasIc2TweaksMethod(ItemArmorJetpack.class, "ic2tweaks$travellersGearMixinApplied"),
                 "TravellersGear");
         }
+        check("jetpack power switch blocks fuel drain", powerOffDrained == 0.0D, "drained=" + powerOffDrained);
         if (refuelPlayer != null) {
             double gained = refuelChargeAfter - refuelChargeBefore;
             check("easy gas refuel fills a worn jetpack", gained > 0.0D, "gained=" + gained);

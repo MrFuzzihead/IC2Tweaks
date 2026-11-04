@@ -176,11 +176,14 @@ public final class JetpackConfig {
     /** Screen corner for the jetpack HUD. */
     public static HudCorner hudCorner = HudCorner.TOP_LEFT;
 
+    /** Show the mode line (Normal/Hover/Disabled) on the jetpack HUD. */
+    public static boolean hudShowMode = false;
+
     /** Show the horizontal speed on the jetpack HUD. */
-    public static boolean hudShowSpeed = true;
+    public static boolean hudShowSpeed = false;
 
     /** Show the player's altitude on the jetpack HUD. */
-    public static boolean hudShowAltitude = true;
+    public static boolean hudShowAltitude = false;
 
     /** Fuel percentage at or below which the HUD shows a low-fuel warning. 0 disables the warning. */
     public static int hudLowFuelPercent = 10;
@@ -217,6 +220,9 @@ public final class JetpackConfig {
 
     /** Enable the dedicated hover key binding (default H, configurable in Controls). */
     public static boolean dedicatedHoverKey = true;
+
+    /** Enable the dedicated jetpack power toggle key binding (default J, configurable in Controls). */
+    public static boolean dedicatedPowerKey = true;
 
     /** Right-click a biogas container to refill a worn gas jetpack. */
     public static boolean easyGasRefuel = true;
@@ -572,11 +578,14 @@ public final class JetpackConfig {
                 "TOP_LEFT",
                 "Screen corner for the jetpack HUD: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT or BOTTOM_RIGHT."));
 
+        hudShowMode = configuration
+            .getBoolean("hudShowMode", CATEGORY, false, "Show the Normal/Hover/Disabled mode line on the jetpack HUD.");
+
         hudShowSpeed = configuration
-            .getBoolean("hudShowSpeed", CATEGORY, true, "Show the horizontal speed on the jetpack HUD.");
+            .getBoolean("hudShowSpeed", CATEGORY, false, "Show the horizontal speed on the jetpack HUD.");
 
         hudShowAltitude = configuration
-            .getBoolean("hudShowAltitude", CATEGORY, true, "Show the player's altitude on the jetpack HUD.");
+            .getBoolean("hudShowAltitude", CATEGORY, false, "Show the player's altitude on the jetpack HUD.");
 
         hudLowFuelPercent = configuration.getInt(
             "hudLowFuelPercent",
@@ -660,6 +669,18 @@ public final class JetpackConfig {
             CATEGORY,
             true,
             "Enable the dedicated hover key binding (default H, configurable in Controls).");
+
+        dedicatedPowerKey = configuration.getBoolean(
+            "dedicatedPowerKey",
+            CATEGORY,
+            true,
+            "Enable the dedicated jetpack power toggle key binding (default J, configurable in Controls).");
+
+        dedicatedPowerKey = configuration.getBoolean(
+            "dedicatedPowerKey",
+            CATEGORY,
+            true,
+            "Enable the dedicated jetpack power toggle key binding (default J, configurable in Controls).");
 
         easyGasRefuel = configuration.getBoolean(
             "easyGasRefuel",

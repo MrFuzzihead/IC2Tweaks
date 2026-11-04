@@ -227,13 +227,15 @@ public class CommandIc2Tweaks extends CommandBase {
             sender,
             String.format(
                 Locale.ROOT,
-                "UX: landing %s (%.1f blocks / %.2f b/t), hover momentum %.2f, pauseGui %s, hover key %s, gas refuel %s",
+                "UX: landing %s (%.1f blocks / %.2f b/t, drain %s), hover momentum %.2f, pauseGui %s, hover key %s, power key %s, gas refuel %s",
                 JetpackConfig.landingAssist,
                 JetpackConfig.landingAssistDistance,
                 JetpackConfig.landingAssistSpeed,
+                JetpackConfig.landingAssistDrain,
                 JetpackConfig.hoverMomentum,
                 JetpackConfig.pauseInGui,
                 JetpackConfig.dedicatedHoverKey,
+                JetpackConfig.dedicatedPowerKey,
                 JetpackConfig.easyGasRefuel));
         send(
             sender,

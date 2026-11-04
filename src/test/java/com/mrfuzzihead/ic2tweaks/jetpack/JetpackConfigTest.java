@@ -94,8 +94,9 @@ class JetpackConfigTest {
 
         assertTrue(JetpackConfig.hudEnabled);
         assertEquals(JetpackConfig.HudCorner.TOP_LEFT, JetpackConfig.hudCorner);
-        assertTrue(JetpackConfig.hudShowSpeed);
-        assertTrue(JetpackConfig.hudShowAltitude);
+        assertFalse(JetpackConfig.hudShowMode);
+        assertFalse(JetpackConfig.hudShowSpeed);
+        assertFalse(JetpackConfig.hudShowAltitude);
         assertEquals(10, JetpackConfig.hudLowFuelPercent);
         assertTrue(JetpackConfig.tooltipsEnabled);
         assertTrue(JetpackConfig.particlesEnabled);
@@ -108,6 +109,7 @@ class JetpackConfigTest {
         assertEquals(0.0F, JetpackConfig.hoverMomentum, 1.0E-6F);
         assertFalse(JetpackConfig.pauseInGui);
         assertTrue(JetpackConfig.dedicatedHoverKey);
+        assertTrue(JetpackConfig.dedicatedPowerKey);
         assertTrue(JetpackConfig.easyGasRefuel);
         assertEquals(0.75F, JetpackConfig.particleYOffset, 1.0E-6F);
 

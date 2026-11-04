@@ -49,8 +49,12 @@ public final class JetpackTooltipHandler {
             }
         }
 
+        boolean powerOff = JetpackItem.isPowerOff(stack);
         boolean hover = stack.hasTagCompound() && stack.getTagCompound()
             .getBoolean("hoverMode");
+        if (powerOff) {
+            event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.power.off"));
+        }
         if (quantum) {
             boolean enabled = stack.hasTagCompound() && stack.getTagCompound()
                 .getBoolean("jetpack");
@@ -108,6 +112,9 @@ public final class JetpackTooltipHandler {
         event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.2"));
         if (JetpackConfig.dedicatedHoverKey) {
             event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.3"));
+        }
+        if (JetpackConfig.dedicatedPowerKey) {
+            event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.power"));
         }
         if (quantum) {
             event.toolTip.add(StatCollector.translateToLocal("ic2tweaks.jetpack.tooltip.controls.quantum"));

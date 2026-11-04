@@ -59,6 +59,12 @@ public final class JetpackHandler {
             return;
         }
 
+        if (JetpackItem.isPowerOff(stack)) {
+            state.stopAudio();
+            state.thrusting = false;
+            return;
+        }
+
         boolean quantum = JetpackItem.isQuantumJetpack(stack);
         if (quantum) {
             // Stock quantum extinguishes the player every chest tick; its onArmorTick is cancelled for
